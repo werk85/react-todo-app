@@ -11,7 +11,7 @@ export const TaskForm: React.FunctionComponent<Props> = ({ isEditing, value, onC
   <div className="input-group">
     <input type="text" className="form-control" name="task" value={value} onChange={event => onChange(event.target.value)} />
     <div className="input-group-append">
-      <button type="submit" className="btn btn-primary" onClick={onSubmit}>
+      <button type="submit" className="btn btn-primary" onClick={onSubmit} disabled={value === ''}>
         {isEditing ? 'Edit' : 'Add'}
       </button>
     </div>

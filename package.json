@@ -4,6 +4,8 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
+    "deploy": "yarn build && gh-pages -d dist -m \"app updated [skip ci]\"",
+    "build": "webpack -p",
     "start": "webpack-dev-server",
     "lint": "eslint --ext .ts,.tsx src",
     "lint:fix": "eslint --ext .ts,.tsx --fix src"
@@ -28,6 +30,7 @@
     "babel-loader": "8.0.6",
     "bootstrap": "4.3.1",
     "cache-loader": "4.1.0",
+    "clean-webpack-plugin": "3.0.0",
     "css-loader": "3.1.0",
     "eslint": "6.0.1",
     "eslint-config-werk85": "https://github.com/werk85/eslint-config-werk85.git",
@@ -35,6 +38,7 @@
     "file-loader": "4.1.0",
     "fork-ts-checker-webpack-plugin": "1.4.3",
     "fp-ts": "2.0.2",
+    "gh-pages": "2.0.1",
     "history": "4.9.0",
     "html-webpack-plugin": "3.2.0",
     "io-ts": "2.0.0",

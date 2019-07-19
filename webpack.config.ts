@@ -4,6 +4,7 @@ import HtmlWebpackPlugin from 'html-webpack-plugin'
 import { Configuration } from 'webpack'
 import WebpackBar from 'webpackbar'
 import TsconfigPathsPlugin from 'tsconfig-paths-webpack-plugin'
+import { CleanWebpackPlugin } from 'clean-webpack-plugin'
 
 const tsconfigPath = path.join(__dirname, 'src/tsconfig.json')
 
@@ -16,7 +17,8 @@ const config: Configuration = {
   },
 
   output: {
-    path: path.join(__dirname, 'cordova/www')
+    path: path.join(__dirname, 'dist'),
+    filename: '[name].[hash].js'
   },
 
   module: {
@@ -68,7 +70,10 @@ const config: Configuration = {
       {
         test: require.resolve('./src/tasks.json'),
         type: 'javascript/auto',
-        loader: 'file-loader'
+        loader: 'file-loader',
+        options: {
+          name: '[name].[hash].[ext]'
+        }
       }
     ]
   },
@@ -83,7 +88,8 @@ const config: Configuration = {
     new HtmlWebpackPlugin({
       template: 'src/index.ejs',
       title: 'Simple Todo'
-    })
+    }),
+    new CleanWebpackPlugin()
   ],
 
   resolve: {

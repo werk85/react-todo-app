@@ -1,7 +1,7 @@
 import * as React from 'react'
 import * as ReactDOM from 'react-dom'
 import { unionize, UnionOf, ofType } from 'unionize'
-import { contramap, ordBoolean, ordString, max } from 'fp-ts/es6/Ord'
+import { contramap, ordBoolean, ordString } from 'fp-ts/es6/Ord'
 import { sort } from 'fp-ts/es6/Array'
 import * as R from 'fp-ts/es6/Record'
 import * as O from 'fp-ts/es6/Option'
@@ -11,7 +11,6 @@ import { Prism, Lens } from 'monocle-ts/es6'
 import { getSemigroup, ordNumber } from 'fp-ts/lib/Ord'
 import * as E from 'fp-ts/lib/Either'
 import { of } from 'rxjs'
-import * as TE from 'fp-ts/es6/TaskEither'
 import * as T from 'fp-ts/es6/Task'
 import * as t from 'io-ts'
 import { withFallback } from 'io-ts-types/lib/withFallback'
@@ -24,14 +23,18 @@ import { Task as TaskComponent } from './components/Task'
 import * as http from './common/http'
 import { run, program, Cmd, none, Dispatch } from 'quantum'
 
-const Task = t.interface({
-  id: t.number,
-  text: t.string,
-  isDone: t.boolean,
-  isFav: withFallback(t.boolean, false)
-})
+const Task = t.interface(
+  {
+    id: t.number,
+    text: t.string,
+    isDone: t.boolean,
+    isFav: withFallback(t.boolean, false)
+  },
+  'Task'
+)
 type Task = t.TypeOf<typeof Task>
 
+// Function for creating an empty task
 const task = (id: number): Task => ({
   id,
   text: '',
@@ -46,20 +49,23 @@ const ordTask = getSemigroup<Task>().concat(ordTaskIsDone, ordTaskText) // Combi
 
 // Util
 const groupTasksBy = R.fromFoldableMap(getFirstSemigroup<Task>(), A.array)
+// Determine the next task id by getting the maximum task id and add one. If empty return 1 as default value
 const nextTaskId = (tasks: Record<string, Task>) =>
   fold(getJoinSemigroup(ordNumber))(1, Object.values(tasks).map(task => task.id)) + 1
 
+// The single state tree used by the application
 interface Model {
   current: Task
   tasks: Record<string, Task>
 }
 
-// Lenses for the Model
+// Lenses for the `Model`
 const currentLens = Lens.fromProp<Model>()('current')
 const currentTextLens = currentLens.composeLens(Lens.fromProp<Task>()('text'))
 const tasksLens = Lens.fromProp<Model>()('tasks')
 const taskByIdOptional = (id: number) => tasksLens.composeLens(atRecord<Task>().at(String(id))).composePrism(Prism.some())
 
+// All actions that can happen in our application
 const Action = unionize({
   ChangeRoute: {},
   Add: {},
@@ -72,8 +78,11 @@ const Action = unionize({
 })
 type Action = UnionOf<typeof Action>
 
+// Not used in our application
 const locationToAction = () => Action.ChangeRoute()
 
+// Commands
+// Load tasks from json file
 const load: Cmd<Action> = of(
   pipe(
     http.get(
@@ -86,6 +95,7 @@ const load: Cmd<Action> = of(
   )
 )
 
+// Generate the initial state of our application and trigger a command if wanted
 const init = (): [Model, Cmd<Action>] => [
   {
     current: task(1),
@@ -94,49 +104,59 @@ const init = (): [Model, Cmd<Action>] => [
   load
 ]
 
-const isEditing = (model: Model) => O.isSome(R.lookup(String(model.current.id), model.tasks))
-
-const update = (action: Action, model: Model): [Model, Cmd<Action>] => [
+const update = (action: Action, model: Model): [Model, Cmd<Action>] =>
   Action.match(action, {
     Add: () => {
+      // Add the new task to the existing tasks
       const tasks = pipe(
         model.tasks,
         R.insertAt(String(model.current.id), model.current)
       )
-      return {
-        current: task(nextTaskId(tasks)),
-        tasks
-      }
+      // Generate the new current task based on the newly created tasks record to determine the next possible id
+      const current = task(nextTaskId(tasks))
+      return [
+        {
+          current,
+          tasks
+        },
+        none
+      ]
     },
-    Edit: ({ task }) => currentLens.set(task)(model),
+    Edit: ({ task }) => [currentLens.set(task)(model), none],
     Load: ({ response }) =>
       pipe(
         response,
         E.fold(
-          () => model,
+          // If the response is an error do nothing by returning the current model
+          () => [model, none],
+          // Else evaluate the http response
           response => {
             const tasks = groupTasksBy(response.body, task => [String(task.id), task])
-            return {
-              current: task(nextTaskId(tasks)),
-              tasks
-            }
+            const current = task(nextTaskId(tasks))
+            return [
+              {
+                current,
+                tasks
+              },
+              none
+            ]
           }
         )
       ),
-    ToggleDone: ({ task }) => taskByIdOptional(task.id).modify(task => ({ ...task, isDone: !task.isDone }))(model),
-    ToggleFav: ({ task }) => taskByIdOptional(task.id).modify(task => ({ ...task, isFav: !task.isFav }))(model),
-    Remove: ({ task }) => tasksLens.modify(R.deleteAt(String(task.id)))(model),
-    UpdateText: ({ text }) => currentTextLens.set(text)(model),
-    default: () => model
-  }),
-  none
-]
+    ToggleDone: ({ task }) => [taskByIdOptional(task.id).modify(task => ({ ...task, isDone: !task.isDone }))(model), none],
+    ToggleFav: ({ task }) => [taskByIdOptional(task.id).modify(task => ({ ...task, isFav: !task.isFav }))(model), none],
+    Remove: ({ task }) => [tasksLens.modify(R.deleteAt(String(task.id)))(model), none],
+    UpdateText: ({ text }) => [currentTextLens.set(text)(model), none],
+    default: () => [model, none]
+  })
 
 const view = (model: Model) => {
-  const tasks = Object.values(model.tasks)
+  // Convert tasks record to array and sort
+  const tasks = sort(ordTask)(Object.values(model.tasks))
   const done = tasks.filter(task => task.isDone).length
   const total = tasks.length
-  const sortedTasks = sort(ordTask)(tasks)
+  // If the current task id is equal to a task that already exists in tasks we are editing
+  const isEditing = O.isSome(R.lookup(String(model.current.id), model.tasks))
 
   return (dispatch: Dispatch<Action>) => (
     <div className="card">
@@ -147,15 +167,16 @@ const view = (model: Model) => {
       </div>
       <div className="card-body">
         <TaskForm
-          isEditing={isEditing(model)}
+          isEditing={isEditing}
           value={model.current.text}
           onChange={text => dispatch(Action.UpdateText({ text }))}
           onSubmit={() => dispatch(Action.Add())}
         />
       </div>
       <ul className="list-group list-group-flush">
+        {/* If we have no tasks we show a placeholder */}
         {total === 0 ? <EmptyTask /> : null}
-        {sortedTasks.map(task => (
+        {tasks.map(task => (
           <TaskComponent
             key={task.id}
             {...task}
