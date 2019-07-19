@@ -1,0 +1,22 @@
+[
+  {
+    "id": 1,
+    "text": "Show done tasks as striked throuth",
+    "isDone": true
+  },
+  {
+    "id": 2,
+    "text": "Show done tasks as striked throuth",
+    "isDone": true
+  },
+  {
+    "id": 3,
+    "text": "Load tasks from fake api",
+    "isDone": true
+  },
+  {
+    "id": 4,
+    "text": "List undone tasks on top of the list",
+    "isDone": false
+  }
+]
