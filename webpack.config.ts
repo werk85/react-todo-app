@@ -64,6 +64,11 @@ const config: Configuration = {
       {
         test: /\.scss$/,
         loaders: ['style-loader', 'css-loader', 'sass-loader']
+      },
+      {
+        test: require.resolve('./src/tasks.json'),
+        type: 'javascript/auto',
+        loader: 'file-loader'
       }
     ]
   },
