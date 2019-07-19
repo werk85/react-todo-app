@@ -1,19 +1,18 @@
 @import "~bootstrap/scss/bootstrap.scss";
 
 .task-container {
-    .btn-left {
-      margin-right: 1em;
-    }
-    .btn-right {
-        margin-left: 1em;
-    }
+  .btn-left {
+    margin-right: 1em;
+  }
+  .btn-right {
+      margin-left: 1em;
+  }
 
-    a:hover {
-        text-decoration: none;
-    }
+  a:hover {
+    text-decoration: none;
+  }
 
-    .disabled, .disabled:hover {
-        // .text-muted();
-        cursor: not-allowed;
-    }
+  .disabled, .disabled:hover {
+    cursor: not-allowed;
+  }
 }
