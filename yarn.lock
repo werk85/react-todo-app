@@ -1672,17 +1672,17 @@ cache-base@^1.0.1:
     union-value "^1.0.0"
     unset-value "^1.0.0"
 
-cache-loader@4.0.1:
-  version "4.0.1"
-  resolved "https://registry.yarnpkg.com/cache-loader/-/cache-loader-4.0.1.tgz#198049cf04e9e599ad90bc6a9c695d5e866cc875"
-  integrity sha512-r5uLI/Igk1qomgoaCvX3LiiDJfKJ03oeAOV7RTrLdkzwxmwjw/JZUr9LYPRsM6CV99SGnR55Tve534aSZsH0mw==
+cache-loader@4.1.0:
+  version "4.1.0"
+  resolved "https://registry.yarnpkg.com/cache-loader/-/cache-loader-4.1.0.tgz#9948cae353aec0a1fcb1eafda2300816ec85387e"
+  integrity sha512-ftOayxve0PwKzBF/GLsZNC9fJBXl8lkZE3TOsjkboHfVHVkL39iUEs1FO07A33mizmci5Dudt38UZrrYXDtbhw==
   dependencies:
     buffer-json "^2.0.0"
     find-cache-dir "^3.0.0"
     loader-utils "^1.2.3"
     mkdirp "^0.5.1"
     neo-async "^2.6.1"
-    schema-utils "^1.0.0"
+    schema-utils "^2.0.0"
 
 callsites@^3.0.0:
   version "3.1.0"
@@ -2121,10 +2121,10 @@ crypto-browserify@^3.11.0:
     randombytes "^2.0.0"
     randomfill "^1.0.3"
 
-css-loader@3.0.0:
-  version "3.0.0"
-  resolved "https://registry.yarnpkg.com/css-loader/-/css-loader-3.0.0.tgz#bdd48a4921eefedf1f0a55266585944d4e5efc63"
-  integrity sha512-WR6KZuCkFbnMhRrGPlkwAA7SSCtwqPwpyXJAPhotYkYsc0mKU9n/fu5wufy4jl2WhBw9Ia8gUQMIp/1w98DuPw==
+css-loader@3.1.0:
+  version "3.1.0"
+  resolved "https://registry.yarnpkg.com/css-loader/-/css-loader-3.1.0.tgz#6f008b993b8ce812e6bab57f3cbfdc7a7cf28685"
+  integrity sha512-MuL8WsF/KSrHCBCYaozBKlx+r7vIfUaDTEreo7wR7Vv3J6N0z6fqWjRk3e/6wjneitXN1r/Y9FTK1psYNOBdJQ==
   dependencies:
     camelcase "^5.3.1"
     cssesc "^3.0.0"
@@ -2137,7 +2137,7 @@ css-loader@3.0.0:
     postcss-modules-scope "^2.1.0"
     postcss-modules-values "^3.0.0"
     postcss-value-parser "^4.0.0"
-    schema-utils "^1.0.0"
+    schema-utils "^2.0.0"
 
 css-select@^1.1.0:
   version "1.2.0"
@@ -2567,11 +2567,12 @@ eslint-config-prettier@^6.0.0:
 
 "eslint-config-werk85@https://github.com/werk85/eslint-config-werk85.git":
   version "0.0.1"
-  resolved "https://github.com/werk85/eslint-config-werk85.git#f06582fc3de060cfb097070861c35b35b7ae5806"
+  resolved "https://github.com/werk85/eslint-config-werk85.git#3a5a676f702e591db4d8832b9aa759109b9e0774"
   dependencies:
     "@typescript-eslint/eslint-plugin" "^1.12.0"
     "@typescript-eslint/parser" "^1.12.0"
     eslint-config-prettier "^6.0.0"
+    eslint-import-resolver-typescript "^1.1.1"
     eslint-plugin-import "^2.18.0"
     eslint-plugin-prettier "^3.1.0"
     prettier "^1.18.2"
@@ -2585,7 +2586,7 @@ eslint-import-resolver-node@^0.3.2:
     debug "^2.6.9"
     resolve "^1.5.0"
 
-eslint-import-resolver-typescript@1.1.1:
+eslint-import-resolver-typescript@^1.1.1:
   version "1.1.1"
   resolved "https://registry.yarnpkg.com/eslint-import-resolver-typescript/-/eslint-import-resolver-typescript-1.1.1.tgz#e6d42172b95144ef16610fe104ef38340edea591"
   integrity sha512-jqSfumQ+H5y3FUJ6NjRkbOQSUOlbBucGTN3ELymOtcDBbPjVdm/luvJuCfCaIXGh8sEF26ma1qVdtDgl9ndhUg==
@@ -2603,9 +2604,9 @@ eslint-module-utils@^2.4.0:
     pkg-dir "^2.0.0"
 
 eslint-plugin-import@^2.18.0:
-  version "2.18.0"
-  resolved "https://registry.yarnpkg.com/eslint-plugin-import/-/eslint-plugin-import-2.18.0.tgz#7a5ba8d32622fb35eb9c8db195c2090bd18a3678"
-  integrity sha512-PZpAEC4gj/6DEMMoU2Df01C5c50r7zdGIN52Yfi7CvvWaYssG7Jt5R9nFG5gmqodxNOz9vQS87xk6Izdtpdrig==
+  version "2.18.1"
+  resolved "https://registry.yarnpkg.com/eslint-plugin-import/-/eslint-plugin-import-2.18.1.tgz#2e4f571d13839543992ad626a18c0edffde9626b"
+  integrity sha512-YEESFKOcMIXJTosb5YaepqVhQHGMb8dxkgov560GqMDP/658U5vk6FeVSR7xXLeYkPc7xPYy+uAoiYE/bKMphA==
   dependencies:
     array-includes "^3.0.3"
     contains-path "^0.1.0"
@@ -2614,8 +2615,8 @@ eslint-plugin-import@^2.18.0:
     eslint-import-resolver-node "^0.3.2"
     eslint-module-utils "^2.4.0"
     has "^1.0.3"
-    lodash "^4.17.11"
     minimatch "^3.0.4"
+    object.values "^1.1.0"
     read-pkg-up "^2.0.0"
     resolve "^1.11.0"
 
@@ -4254,9 +4255,9 @@ lodash.unescape@4.0.1:
   integrity sha1-vyJJiGzlFM2hEvrpIYzcBlIR/Jw=
 
 lodash@^4.0.0, lodash@^4.17.11, lodash@^4.17.12, lodash@^4.17.13, lodash@^4.17.14, lodash@^4.17.3, lodash@~4.17.10:
-  version "4.17.14"
-  resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.14.tgz#9ce487ae66c96254fe20b599f21b6816028078ba"
-  integrity sha512-mmKYbW3GLuJeX+iGP+Y7Gp1AiGHGbXHCOh/jZmrawMmsE7MS4znI3RL2FsjbqOyMayHInjOeykW7PEajUk1/xw==
+  version "4.17.15"
+  resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.15.tgz#b447f6670a0455bbfeedd11392eff330ea097548"
+  integrity sha512-8xOcRHvCjnocdS5cpwXQXVzmmh5e5+saE2QGoeQmbKmRS6J3VQppPOIt0MnmE+4xlZoumy0GPG0D0MVIQbNA1A==
 
 loglevel@^1.6.3:
   version "1.6.3"
@@ -5972,6 +5973,14 @@ schema-utils@^1.0.0:
   dependencies:
     ajv "^6.1.0"
     ajv-errors "^1.0.0"
+    ajv-keywords "^3.1.0"
+
+schema-utils@^2.0.0:
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/schema-utils/-/schema-utils-2.0.1.tgz#1eec2e059556af841b7f3a83b61af13d7a3f9196"
+  integrity sha512-HJFKJ4JixDpRur06QHwi8uu2kZbng318ahWEKgBjc0ZklcE4FDvmm2wghb448q0IRaABxIESt8vqPFvwgMB80A==
+  dependencies:
+    ajv "^6.1.0"
     ajv-keywords "^3.1.0"
 
 scss-tokenizer@^0.2.3:
