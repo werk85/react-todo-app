@@ -10,18 +10,15 @@ import { atRecord } from 'monocle-ts/es6/At/Record'
 import { Prism, Lens } from 'monocle-ts/es6'
 import { getSemigroup, ordNumber } from 'fp-ts/lib/Ord'
 import * as E from 'fp-ts/lib/Either'
-import { of } from 'rxjs'
-import * as T from 'fp-ts/es6/Task'
 import * as t from 'io-ts'
 import { withFallback } from 'io-ts-types/lib/withFallback'
 import { getFirstSemigroup, getJoinSemigroup, fold } from 'fp-ts/es6/Semigroup'
 import * as A from 'fp-ts/lib/Array'
+import { cmd, html, http, platform } from 'effe-ts'
 import { Title } from './components/Title'
 import { TaskForm } from './components/TaskForm'
 import { EmptyTask } from './components/EmptyTask'
 import { Task as TaskComponent } from './components/Task'
-import * as http from './common/http'
-import { run, program, Cmd, none, Dispatch } from 'quantum'
 
 const Task = t.interface(
   {
@@ -67,7 +64,6 @@ const taskByIdOptional = (id: number) => tasksLens.composeLens(atRecord<Task>().
 
 // All actions that can happen in our application
 const Action = unionize({
-  ChangeRoute: {},
   Add: {},
   Edit: ofType<{ task: Task }>(),
   Load: ofType<{ response: E.Either<http.HttpErrorResponse, http.Response<Task[]>> }>(),
@@ -78,25 +74,12 @@ const Action = unionize({
 })
 type Action = UnionOf<typeof Action>
 
-// Not used in our application
-const locationToAction = () => Action.ChangeRoute()
-
 // Commands
 // Load tasks from json file
-const load: Cmd<Action> = of(
-  pipe(
-    http.get(
-      {
-        url: require('./tasks.json')
-      },
-      t.array(Task)
-    ),
-    T.map(response => O.some(Action.Load({ response })))
-  )
-)
+const load: cmd.Cmd<Action> = http.send(http.get(require('./tasks.json'), t.array(Task)), response => Action.Load({ response }))
 
 // Generate the initial state of our application and trigger a command if wanted
-const init = (): [Model, Cmd<Action>] => [
+const init: [Model, cmd.Cmd<Action>] = [
   {
     current: task(1),
     tasks: {}
@@ -104,7 +87,7 @@ const init = (): [Model, Cmd<Action>] => [
   load
 ]
 
-const update = (action: Action, model: Model): [Model, Cmd<Action>] =>
+const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
   Action.match(action, {
     Add: () => {
       // Add the new task to the existing tasks
@@ -119,16 +102,16 @@ const update = (action: Action, model: Model): [Model, Cmd<Action>] =>
           current,
           tasks
         },
-        none
+        cmd.none
       ]
     },
-    Edit: ({ task }) => [currentLens.set(task)(model), none],
+    Edit: ({ task }) => [currentLens.set(task)(model), cmd.none],
     Load: ({ response }) =>
       pipe(
         response,
         E.fold(
           // If the response is an error do nothing by returning the current model
-          () => [model, none],
+          () => [model, cmd.none],
           // Else evaluate the http response
           response => {
             const tasks = groupTasksBy(response.body, task => [String(task.id), task])
@@ -138,16 +121,16 @@ const update = (action: Action, model: Model): [Model, Cmd<Action>] =>
                 current,
                 tasks
               },
-              none
+              cmd.none
             ]
           }
         )
       ),
-    ToggleDone: ({ task }) => [taskByIdOptional(task.id).modify(task => ({ ...task, isDone: !task.isDone }))(model), none],
-    ToggleFav: ({ task }) => [taskByIdOptional(task.id).modify(task => ({ ...task, isFav: !task.isFav }))(model), none],
-    Remove: ({ task }) => [tasksLens.modify(R.deleteAt(String(task.id)))(model), none],
-    UpdateText: ({ text }) => [currentTextLens.set(text)(model), none],
-    default: () => [model, none]
+    ToggleDone: ({ task }) => [taskByIdOptional(task.id).modify(task => ({ ...task, isDone: !task.isDone }))(model), cmd.none],
+    ToggleFav: ({ task }) => [taskByIdOptional(task.id).modify(task => ({ ...task, isFav: !task.isFav }))(model), cmd.none],
+    Remove: ({ task }) => [tasksLens.modify(R.deleteAt(String(task.id)))(model), cmd.none],
+    UpdateText: ({ text }) => [currentTextLens.set(text)(model), cmd.none],
+    default: () => [model, cmd.none]
   })
 
 const view = (model: Model) => {
@@ -158,7 +141,7 @@ const view = (model: Model) => {
   // If the current task id is equal to a task that already exists in tasks we are editing
   const isEditing = O.isSome(R.lookup(String(model.current.id), model.tasks))
 
-  return (dispatch: Dispatch<Action>) => (
+  return (dispatch: platform.Dispatch<Action>) => (
     <div className="card">
       <div className="card-header">
         <h3 className="card-title">
@@ -191,8 +174,8 @@ const view = (model: Model) => {
   )
 }
 
-const app = program(locationToAction, init, update, view)
+const app = html.program(init, update, view)
 
-run(app, dom => {
+html.run(app, dom => {
   ReactDOM.render(dom, document.getElementById('app'))
 })

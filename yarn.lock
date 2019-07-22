@@ -2474,6 +2474,17 @@ ee-first@1.1.1:
   resolved "https://registry.yarnpkg.com/ee-first/-/ee-first-1.1.1.tgz#590c61156b0ae2f4f0255732a158b266bc56b21d"
   integrity sha1-WQxhFWsK4vTwJVcyoViyZrxWsh0=
 
+"effe-ts@https://github.com/werk85/effe-ts.git":
+  version "0.0.1"
+  resolved "https://github.com/werk85/effe-ts.git#61656ac4c3da07fd689a36a86ce542f562460267"
+  dependencies:
+    fp-ts "^2.0.2"
+    fp-ts-rxjs "^0.6.0"
+    history "^4.9.0"
+    io-ts "^2.0.0"
+    rxjs "^6.5.2"
+    unionize "^3.0.2"
+
 electron-to-chromium@^1.3.191:
   version "1.3.194"
   resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.3.194.tgz#a96452a96d4539131957aade9f634a45721f2819"
@@ -3171,7 +3182,12 @@ forwarded@~0.1.2:
   resolved "https://registry.yarnpkg.com/forwarded/-/forwarded-0.1.2.tgz#98c23dab1175657b8c0573e8ceccd91b0ff18c84"
   integrity sha1-mMI9qxF1ZXuMBXPozszZGw/xjIQ=
 
-fp-ts@2.0.2:
+fp-ts-rxjs@^0.6.0:
+  version "0.6.0"
+  resolved "https://registry.yarnpkg.com/fp-ts-rxjs/-/fp-ts-rxjs-0.6.0.tgz#1a90cee723f08920a9b400257d84ae61edeed42c"
+  integrity sha512-/kYV++9aV9kGVCKbS1mgw3S2xpzycb9o/Wp9TwAYqEmJjHA0/JYy6rUpV/btB0ZsswdAUguh6OG6kEC3rCPAlQ==
+
+fp-ts@2.0.2, fp-ts@^2.0.2:
   version "2.0.2"
   resolved "https://registry.yarnpkg.com/fp-ts/-/fp-ts-2.0.2.tgz#8f27d76e24097c3ab4e766ea7526872d6ba0555d"
   integrity sha512-ZCeu5MkqNDBWe1ewjZQ9Q9JNcPKEKXpitYzJ4ygCWpfJ3skW3imZ45EqsZd+9N8rkBvmsb64ToZTI2xXNO9IcQ==
@@ -3514,7 +3530,7 @@ he@1.2.x:
   resolved "https://registry.yarnpkg.com/he/-/he-1.2.0.tgz#84ae65fa7eafb165fddb61566ae14baf05664f0f"
   integrity sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==
 
-history@4.9.0:
+history@4.9.0, history@^4.9.0:
   version "4.9.0"
   resolved "https://registry.yarnpkg.com/history/-/history-4.9.0.tgz#84587c2068039ead8af769e9d6a6860a14fa1bca"
   integrity sha512-H2DkjCjXf0Op9OAr6nJ56fcRkTSNrUiv41vNJ6IswJjif6wlpZK0BTfFbi7qK9dXLSYZxkq5lBsj3vUjlYBYZA==
@@ -3844,7 +3860,7 @@ io-ts-types@0.5.0:
   resolved "https://registry.yarnpkg.com/io-ts-types/-/io-ts-types-0.5.0.tgz#f69be9131362c31bbc6b5044f1d95892604f8f23"
   integrity sha512-+v88rlA76FmlQQcTImFq5iigoPA3OKO+BIdrpsfXlhWUdiVvOnDDiLKCsiIAW9eRj+OJgG31Sctebr77bqKhzw==
 
-io-ts@2.0.0:
+io-ts@2.0.0, io-ts@^2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/io-ts/-/io-ts-2.0.0.tgz#560f8ddf92cce7ea73820cedab7b31044e464d1e"
   integrity sha512-6i8PKyNR/dvEbUU9uE+v4iVFU7l674ZEGQsh92y6xEZF/rj46fXbPy+uPPXJEsCP0J0X3UpzXAxp04K4HR2jVw==
@@ -6028,7 +6044,7 @@ run-queue@^1.0.0, run-queue@^1.0.3:
   dependencies:
     aproba "^1.1.1"
 
-rxjs@6.5.2, rxjs@^6.4.0:
+rxjs@6.5.2, rxjs@^6.4.0, rxjs@^6.5.2:
   version "6.5.2"
   resolved "https://registry.yarnpkg.com/rxjs/-/rxjs-6.5.2.tgz#2e35ce815cd46d84d02a209fb4e5921e051dbec7"
   integrity sha512-HUb7j3kvb7p7eCUHE3FqjoDsC1xfZQ4AHFWfTKSpZ+sAhhz5X1WX0ZuUqWbzB2QhSLp3DoLUG+hMdEDKqWo2Zg==
@@ -6992,7 +7008,7 @@ union-value@^1.0.0:
     is-extendable "^0.1.1"
     set-value "^2.0.1"
 
-unionize@3.0.2:
+unionize@3.0.2, unionize@^3.0.2:
   version "3.0.2"
   resolved "https://registry.yarnpkg.com/unionize/-/unionize-3.0.2.tgz#b01c932268cc07f846aba5e675c1ec746084c013"
   integrity sha512-sLc/42zpKCqJ3YAGmap6k8axrnnLwiDN+Nb5s1jz0LgR3Jz/n0X2C8RBVflpFt/V6h/BzqaCM2hZSFoieXX/VA==
