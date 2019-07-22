@@ -92,6 +92,18 @@ const config: Configuration = {
     new CleanWebpackPlugin()
   ],
 
+  optimization: {
+    splitChunks: {
+      cacheGroups: {
+        commons: {
+          test: /[\\/]node_modules[\\/]/,
+          name: 'vendors',
+          chunks: 'all'
+        }
+      }
+    }
+  },
+
   resolve: {
     extensions: ['.js', '.ts', '.tsx', '.json'],
     plugins: [new TsconfigPathsPlugin({ configFile: tsconfigPath })]
