@@ -1,6 +1,5 @@
 import * as React from 'react'
 import * as ReactDOM from 'react-dom'
-import { unionize, UnionOf, ofType } from 'unionize'
 import { contramap, ordBoolean, ordString } from 'fp-ts/es6/Ord'
 import { sort } from 'fp-ts/es6/Array'
 import * as R from 'fp-ts/es6/Record'
@@ -14,7 +13,7 @@ import * as t from 'io-ts'
 import { withFallback } from 'io-ts-types/lib/withFallback'
 import { getFirstSemigroup, getJoinSemigroup, fold } from 'fp-ts/es6/Semigroup'
 import * as A from 'fp-ts/lib/Array'
-import { cmd, html, http, platform } from 'effe-ts'
+import { action, cmd, html, http, platform } from 'effe-ts'
 import { Title } from './components/Title'
 import { TaskForm } from './components/TaskForm'
 import { EmptyTask } from './components/EmptyTask'
@@ -63,16 +62,16 @@ const tasksLens = Lens.fromProp<Model>()('tasks')
 const taskByIdOptional = (id: number) => tasksLens.composeLens(atRecord<Task>().at(String(id))).composePrism(Prism.some())
 
 // All actions that can happen in our application
-const Action = unionize({
+const Action = action.create({
   Add: {},
-  Edit: ofType<{ task: Task }>(),
-  Load: ofType<{ response: E.Either<http.HttpErrorResponse, http.Response<Task[]>> }>(),
-  ToggleDone: ofType<{ task: Task }>(),
-  ToggleFav: ofType<{ task: Task }>(),
-  Remove: ofType<{ task: Task }>(),
-  UpdateText: ofType<{ text: string }>()
+  Edit: action.withPayload<{ task: Task }>(),
+  Load: action.withPayload<{ response: E.Either<http.HttpErrorResponse, http.Response<Task[]>> }>(),
+  ToggleDone: action.withPayload<{ task: Task }>(),
+  ToggleFav: action.withPayload<{ task: Task }>(),
+  Remove: action.withPayload<{ task: Task }>(),
+  UpdateText: action.withPayload<{ text: string }>()
 })
-type Action = UnionOf<typeof Action>
+type Action = action.ActionOf<typeof Action>
 
 // Commands
 // Load tasks from json file

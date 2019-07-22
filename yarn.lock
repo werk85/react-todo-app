@@ -2474,12 +2474,12 @@ ee-first@1.1.1:
   resolved "https://registry.yarnpkg.com/ee-first/-/ee-first-1.1.1.tgz#590c61156b0ae2f4f0255732a158b266bc56b21d"
   integrity sha1-WQxhFWsK4vTwJVcyoViyZrxWsh0=
 
-"effe-ts@https://github.com/werk85/effe-ts.git":
+effe-ts@0.0.1:
   version "0.0.1"
-  resolved "https://github.com/werk85/effe-ts.git#61656ac4c3da07fd689a36a86ce542f562460267"
+  resolved "https://registry.yarnpkg.com/effe-ts/-/effe-ts-0.0.1.tgz#b56b5480dffef85642c2167072bd6d618aedb0a2"
+  integrity sha512-TjNSz7sZssmpFFLEzFr+Nw4GY59zm0ceeDEAETR3bHOTQL+yDGpiAcytg5seAHv1j0Iar5CT4EdGp3E8m1xUBw==
   dependencies:
     fp-ts "^2.0.2"
-    fp-ts-rxjs "^0.6.0"
     history "^4.9.0"
     io-ts "^2.0.0"
     rxjs "^6.5.2"
@@ -3181,11 +3181,6 @@ forwarded@~0.1.2:
   version "0.1.2"
   resolved "https://registry.yarnpkg.com/forwarded/-/forwarded-0.1.2.tgz#98c23dab1175657b8c0573e8ceccd91b0ff18c84"
   integrity sha1-mMI9qxF1ZXuMBXPozszZGw/xjIQ=
-
-fp-ts-rxjs@^0.6.0:
-  version "0.6.0"
-  resolved "https://registry.yarnpkg.com/fp-ts-rxjs/-/fp-ts-rxjs-0.6.0.tgz#1a90cee723f08920a9b400257d84ae61edeed42c"
-  integrity sha512-/kYV++9aV9kGVCKbS1mgw3S2xpzycb9o/Wp9TwAYqEmJjHA0/JYy6rUpV/btB0ZsswdAUguh6OG6kEC3rCPAlQ==
 
 fp-ts@2.0.2, fp-ts@^2.0.2:
   version "2.0.2"
