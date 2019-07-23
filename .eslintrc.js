@@ -1,7 +1,6 @@
 module.exports = {
   extends: [
-    'werk85/modern',
-    'plugin:react/recommended',
+    'werk85/react',
   ],
   parserOptions: {
     project: './src/tsconfig.json',
@@ -14,13 +13,6 @@ module.exports = {
       typescript: {
         directory: 'src'
       }
-    },
-    react: {
-      version: 'detect'
     }
-  },
-  rules: {
-    'react/display-name': 'off',
-    'react/prop-types': 'off'
   }
 }

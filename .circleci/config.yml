@@ -1,0 +1,56 @@
+version: 2.1
+
+commands:
+  setup:
+    description: Checkout and Install Dependencies
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            # when lock file changes, use increasingly general patterns to restore cache
+            - yarn-packages-v1-{{ .Branch }}-{{ checksum "yarn.lock" }}
+            - yarn-packages-v1-{{ .Branch }}-
+            - yarn-packages-v1-
+      - run:
+          name: Install Dependencies
+          command: yarn --frozen-lockfile
+      - save_cache:
+          paths:
+            - ~/.cache/yarn
+          key: yarn-packages-v1-{{ .Branch }}-{{ checksum "yarn.lock" }}
+
+jobs:
+  lint:
+    docker:
+      - image: circleci/node:10
+    steps:
+      - setup
+      - run:
+          name: Lint
+          command: yarn lint
+  deploy:
+    docker:
+      - image: circleci/node:10
+    steps:
+      - run:
+          name: Configure Git
+          command: |
+            git config --global user.email "ci@werk85.de"
+            git config --global user.name "ci"
+      - setup
+      - run:
+          name: Deploy to GH-Pages
+          command: yarn deploy
+
+workflows:
+  version: 2
+  lint_and_deploy:
+    jobs:
+      - lint
+      - deploy:
+          filters:
+            branches:
+              only:
+                - master
+          requires:
+            - lint
