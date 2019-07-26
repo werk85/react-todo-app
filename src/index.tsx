@@ -1,24 +1,21 @@
-import * as React from 'react'
-import * as ReactDOM from 'react-dom'
-import { contramap, ordBoolean, ordString } from 'fp-ts/es6/Ord'
-import { sort } from 'fp-ts/es6/Array'
+import { contramap, ordBoolean, ordString, getSemigroup, ordNumber } from 'fp-ts/es6/Ord'
 import * as R from 'fp-ts/es6/Record'
-import * as O from 'fp-ts/es6/Option'
 import { pipe } from 'fp-ts/es6/pipeable'
 import { atRecord } from 'monocle-ts/es6/At/Record'
 import { Prism, Lens } from 'monocle-ts/es6'
-import { getSemigroup, ordNumber } from 'fp-ts/lib/Ord'
-import * as E from 'fp-ts/lib/Either'
+import * as E from 'fp-ts/es6/Either'
 import * as t from 'io-ts'
 import { withFallback } from 'io-ts-types/lib/withFallback'
 import { getFirstSemigroup, getJoinSemigroup, fold } from 'fp-ts/es6/Semigroup'
-import * as A from 'fp-ts/lib/Array'
+import * as A from 'fp-ts/es6/Array'
 import { cmd, html, http, platform } from 'effe-ts'
 import { unionize, ofType, UnionOf } from 'unionize'
 import { Title } from './components/Title'
 import { TaskForm } from './components/TaskForm'
 import { EmptyTask } from './components/EmptyTask'
 import { Task as TaskComponent } from './components/Task'
+import * as ReactDOM from 'react-dom'
+import * as React from 'react'
 
 const Task = t.interface(
   {
@@ -43,6 +40,7 @@ const task = (id: number): Task => ({
 const ordTaskText = contramap<string, Task>(task => task.text)(ordString) // Order by text
 const ordTaskIsDone = contramap<boolean, Task>(task => task.isDone)(ordBoolean) // Order by isDone
 const ordTask = getSemigroup<Task>().concat(ordTaskIsDone, ordTaskText) // Combine both ordering strategies
+const sortTasks = A.sort(ordTask)
 
 // Util
 const groupTasksBy = R.fromFoldableMap(getFirstSemigroup<Task>(), A.array)
@@ -135,11 +133,11 @@ const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
 
 const view = (model: Model) => {
   // Convert tasks record to array and sort
-  const tasks = sort(ordTask)(Object.values(model.tasks))
+  const tasks = sortTasks(Object.values(model.tasks))
   const done = tasks.filter(task => task.isDone).length
   const total = tasks.length
   // If the current task id is equal to a task that already exists in tasks we are editing
-  const isEditing = O.isSome(R.lookup(String(model.current.id), model.tasks))
+  const isEditing = R.hasOwnProperty(String(model.current.id), model.tasks)
 
   return (dispatch: platform.Dispatch<Action>) => (
     <div className="card">
