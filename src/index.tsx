@@ -1,13 +1,13 @@
-import { contramap, ordBoolean, ordString, getSemigroup, ordNumber } from 'fp-ts/es6/Ord'
-import * as R from 'fp-ts/es6/Record'
-import { pipe } from 'fp-ts/es6/pipeable'
+import { contramap, ordBoolean, ordString, getSemigroup, ordNumber } from 'fp-ts/lib/Ord'
+import * as R from 'fp-ts/lib/Record'
+import { pipe } from 'fp-ts/lib/pipeable'
 import { atRecord } from 'monocle-ts/es6/At/Record'
 import { Prism, Lens } from 'monocle-ts/es6'
-import * as E from 'fp-ts/es6/Either'
+import * as E from 'fp-ts/lib/Either'
 import * as t from 'io-ts'
 import { withFallback } from 'io-ts-types/lib/withFallback'
-import { getFirstSemigroup, getJoinSemigroup, fold } from 'fp-ts/es6/Semigroup'
-import * as A from 'fp-ts/es6/Array'
+import { getFirstSemigroup, getJoinSemigroup, fold } from 'fp-ts/lib/Semigroup'
+import * as A from 'fp-ts/lib/Array'
 import { cmd, html, http, platform } from 'effe-ts'
 import { unionize, ofType, UnionOf } from 'unionize'
 import { Title } from './components/Title'
@@ -64,7 +64,7 @@ const taskByIdOptional = (id: number) => tasksLens.composeLens(atRecord<Task>().
 const Action = unionize({
   Add: {},
   Edit: ofType<{ task: Task }>(),
-  Load: ofType<{ response: E.Either<http.HttpErrorResponse, http.Response<Task[]>> }>(),
+  Load: ofType<{ response: http.HttpResponseEither<Task[]> }>(),
   ToggleDone: ofType<{ task: Task }>(),
   ToggleFav: ofType<{ task: Task }>(),
   Remove: ofType<{ task: Task }>(),
