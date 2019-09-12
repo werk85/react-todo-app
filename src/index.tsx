@@ -9,27 +9,27 @@ import { withFallback } from 'io-ts-types/lib/withFallback'
 import { getFirstSemigroup, getJoinSemigroup, fold } from 'fp-ts/lib/Semigroup'
 import * as A from 'fp-ts/lib/Array'
 import { cmd, html, http, platform } from 'effe-ts'
-import { unionize, ofType, UnionOf } from 'unionize'
+import { Union, of } from 'ts-union'
 import { Title } from './components/Title'
-import { TaskForm } from './components/TaskForm'
+import { TodoForm } from './components/TodoForm'
 import { EmptyTask } from './components/EmptyTask'
-import { Task as TaskComponent } from './components/Task'
+import { Todo as TodoComponent } from './components/Todo'
 import * as ReactDOM from 'react-dom'
 import * as React from 'react'
 
-const Task = t.interface(
+const Todo = t.interface(
   {
     id: t.number,
     text: t.string,
     isDone: t.boolean,
     isFav: withFallback(t.boolean, false)
   },
-  'Task'
+  'Todo'
 )
-type Task = t.TypeOf<typeof Task>
+type Todo = t.TypeOf<typeof Todo>
 
 // Function for creating an empty task
-const task = (id: number): Task => ({
+const todo = (id: number): Todo => ({
   id,
   text: '',
   isDone: false,
@@ -37,50 +37,50 @@ const task = (id: number): Task => ({
 })
 
 // Define how tasks should be ordered
-const ordTaskText = contramap<string, Task>(task => task.text)(ordString) // Order by text
-const ordTaskIsDone = contramap<boolean, Task>(task => task.isDone)(ordBoolean) // Order by isDone
-const ordTask = getSemigroup<Task>().concat(ordTaskIsDone, ordTaskText) // Combine both ordering strategies
-const sortTasks = A.sort(ordTask)
+const ordTodoText = contramap<string, Todo>(todo => todo.text)(ordString) // Order by text
+const ordTodoIsDone = contramap<boolean, Todo>(todo => todo.isDone)(ordBoolean) // Order by isDone
+const ordTask = getSemigroup<Todo>().concat(ordTodoIsDone, ordTodoText) // Combine both ordering strategies
+const sortTodos = A.sort(ordTask)
 
 // Util
-const groupTasksBy = R.fromFoldableMap(getFirstSemigroup<Task>(), A.array)
+const groupTasksBy = R.fromFoldableMap(getFirstSemigroup<Todo>(), A.array)
 // Determine the next task id by getting the maximum task id and add one. If empty return 1 as default value
-const nextTaskId = (tasks: Record<string, Task>) =>
+const nextTaskId = (tasks: Record<string, Todo>) =>
   fold(getJoinSemigroup(ordNumber))(1, Object.values(tasks).map(task => task.id)) + 1
 
 // The single state tree used by the application
 interface Model {
-  current: Task
-  tasks: Record<string, Task>
+  current: Todo
+  todos: Record<string, Todo>
 }
 
 // Lenses for the `Model`
 const currentLens = Lens.fromProp<Model>()('current')
-const currentTextLens = currentLens.composeLens(Lens.fromProp<Task>()('text'))
-const tasksLens = Lens.fromProp<Model>()('tasks')
-const taskByIdOptional = (id: number) => tasksLens.composeLens(atRecord<Task>().at(String(id))).composePrism(Prism.some())
+const currentTextLens = currentLens.composeLens(Lens.fromProp<Todo>()('text'))
+const todosLens = Lens.fromProp<Model>()('todos')
+const todoByIdOptional = (id: number) => todosLens.composeLens(atRecord<Todo>().at(String(id))).composePrism(Prism.some())
 
 // All actions that can happen in our application
-const Action = unionize({
-  Add: {},
-  Edit: ofType<{ task: Task }>(),
-  Load: ofType<{ response: http.HttpResponseEither<Task[]> }>(),
-  ToggleDone: ofType<{ task: Task }>(),
-  ToggleFav: ofType<{ task: Task }>(),
-  Remove: ofType<{ task: Task }>(),
-  UpdateText: ofType<{ text: string }>()
+const Action = Union({
+  Add: of(),
+  Edit: of<{ todo: Todo }>(),
+  Load: of<{ response: http.HttpResponseEither<Todo[]> }>(),
+  ToggleDone: of<{ todo: Todo }>(),
+  ToggleFav: of<{ todo: Todo }>(),
+  Remove: of<{ todo: Todo }>(),
+  UpdateText: of<{ text: string }>()
 })
-type Action = UnionOf<typeof Action>
+type Action = typeof Action.T
 
 // Commands
 // Load tasks from json file
-const load: cmd.Cmd<Action> = http.send(http.get(require('./tasks.json'), t.array(Task)), response => Action.Load({ response }))
+const load: cmd.Cmd<Action> = http.send(http.get(require('./tasks.json'), t.array(Todo)), response => Action.Load({ response }))
 
 // Generate the initial state of our application and trigger a command if wanted
 const init: [Model, cmd.Cmd<Action>] = [
   {
-    current: task(1),
-    tasks: {}
+    current: todo(1),
+    todos: {}
   },
   load
 ]
@@ -89,21 +89,21 @@ const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
   Action.match(action, {
     Add: () => {
       // Add the new task to the existing tasks
-      const tasks = pipe(
-        model.tasks,
+      const todos = pipe(
+        model.todos,
         R.insertAt(String(model.current.id), model.current)
       )
       // Generate the new current task based on the newly created tasks record to determine the next possible id
-      const current = task(nextTaskId(tasks))
+      const current = todo(nextTaskId(todos))
       return [
         {
           current,
-          tasks
+          todos
         },
         cmd.none
       ]
     },
-    Edit: ({ task }) => [currentLens.set(task)(model), cmd.none],
+    Edit: ({ todo }) => [currentLens.set(todo)(model), cmd.none],
     Load: ({ response }) =>
       pipe(
         response,
@@ -112,32 +112,32 @@ const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
           () => [model, cmd.none],
           // Else evaluate the http response
           response => {
-            const tasks = groupTasksBy(response.body, task => [String(task.id), task])
-            const current = task(nextTaskId(tasks))
+            const todos = groupTasksBy(response.body, todo => [String(todo.id), todo])
+            const current = todo(nextTaskId(todos))
             return [
               {
                 current,
-                tasks
+                todos
               },
               cmd.none
             ]
           }
         )
       ),
-    ToggleDone: ({ task }) => [taskByIdOptional(task.id).modify(task => ({ ...task, isDone: !task.isDone }))(model), cmd.none],
-    ToggleFav: ({ task }) => [taskByIdOptional(task.id).modify(task => ({ ...task, isFav: !task.isFav }))(model), cmd.none],
-    Remove: ({ task }) => [tasksLens.modify(R.deleteAt(String(task.id)))(model), cmd.none],
+    ToggleDone: ({ todo }) => [todoByIdOptional(todo.id).modify(todo => ({ ...todo, isDone: !todo.isDone }))(model), cmd.none],
+    ToggleFav: ({ todo }) => [todoByIdOptional(todo.id).modify(todo => ({ ...todo, isFav: !todo.isFav }))(model), cmd.none],
+    Remove: ({ todo }) => [todosLens.modify(R.deleteAt(String(todo.id)))(model), cmd.none],
     UpdateText: ({ text }) => [currentTextLens.set(text)(model), cmd.none],
     default: () => [model, cmd.none]
   })
 
 const view = (model: Model) => {
-  // Convert tasks record to array and sort
-  const tasks = sortTasks(Object.values(model.tasks))
-  const done = tasks.filter(task => task.isDone).length
-  const total = tasks.length
-  // If the current task id is equal to a task that already exists in tasks we are editing
-  const isEditing = R.hasOwnProperty(String(model.current.id), model.tasks)
+  // Convert todos record to array and sort
+  const todos = sortTodos(Object.values(model.todos))
+  const done = todos.filter(todo => todo.isDone).length
+  const total = todos.length
+  // If the current todo id is equal to a todo that already exists in todos we are editing
+  const isEditing = R.hasOwnProperty(String(model.current.id), model.todos)
 
   return (dispatch: platform.Dispatch<Action>) => (
     <div className="card">
@@ -147,7 +147,7 @@ const view = (model: Model) => {
         </h3>
       </div>
       <div className="card-body">
-        <TaskForm
+        <TodoForm
           isEditing={isEditing}
           value={model.current.text}
           onChange={text => dispatch(Action.UpdateText({ text }))}
@@ -157,14 +157,14 @@ const view = (model: Model) => {
       <ul className="list-group list-group-flush">
         {/* If we have no tasks we show a placeholder */}
         {total === 0 ? <EmptyTask /> : null}
-        {tasks.map(task => (
-          <TaskComponent
-            key={task.id}
-            {...task}
-            onEdit={() => dispatch(Action.Edit({ task }))}
-            onRemove={() => dispatch(Action.Remove({ task }))}
-            onToggleDone={() => dispatch(Action.ToggleDone({ task }))}
-            onToggleFav={() => dispatch(Action.ToggleFav({ task }))}
+        {todos.map(todo => (
+          <TodoComponent
+            key={todo.id}
+            {...todo}
+            onEdit={() => dispatch(Action.Edit({ todo }))}
+            onRemove={() => dispatch(Action.Remove({ todo }))}
+            onToggleDone={() => dispatch(Action.ToggleDone({ todo }))}
+            onToggleFav={() => dispatch(Action.ToggleFav({ todo }))}
           />
         ))}
       </ul>

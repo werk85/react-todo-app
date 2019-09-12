@@ -14,7 +14,7 @@ export interface Props {
   onRemove: () => void
 }
 
-export const Task: React.FunctionComponent<Props> = ({ isFav, isDone, text, onEdit, onToggleFav, onToggleDone, onRemove }) => (
+export const Todo: React.FunctionComponent<Props> = ({ isFav, isDone, text, onEdit, onToggleFav, onToggleDone, onRemove }) => (
   <li className="task-container list-group-item d-flex justify-content-between align-items-center">
     <div>
       <a href="#" className="btn-left" onClick={onToggleFav}>
