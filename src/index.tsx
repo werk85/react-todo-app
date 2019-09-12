@@ -1,132 +1,156 @@
-import { contramap, ordBoolean, ordString, getSemigroup, ordNumber } from 'fp-ts/lib/Ord'
+import { contramap, ordBoolean, ordString, getSemigroup } from 'fp-ts/lib/Ord'
 import * as R from 'fp-ts/lib/Record'
 import { pipe } from 'fp-ts/lib/pipeable'
 import { atRecord } from 'monocle-ts/es6/At/Record'
 import { Prism, Lens } from 'monocle-ts/es6'
 import * as E from 'fp-ts/lib/Either'
-import * as t from 'io-ts'
-import { withFallback } from 'io-ts-types/lib/withFallback'
-import { getFirstSemigroup, getJoinSemigroup, fold } from 'fp-ts/lib/Semigroup'
+import { getFirstSemigroup } from 'fp-ts/lib/Semigroup'
 import * as A from 'fp-ts/lib/Array'
-import { cmd, html, http, platform } from 'effe-ts'
+import { cmd, html, platform } from 'effe-ts'
 import { Union, of } from 'ts-union'
+import * as random from './random'
 import { Title } from './components/Title'
 import { TodoForm } from './components/TodoForm'
 import { EmptyTask } from './components/EmptyTask'
 import { Todo as TodoComponent } from './components/Todo'
+import * as api from './api'
+import uuid from 'uuid'
 import * as ReactDOM from 'react-dom'
 import * as React from 'react'
 
-const Todo = t.interface(
-  {
-    id: t.number,
-    text: t.string,
-    isDone: t.boolean,
-    isFav: withFallback(t.boolean, false)
-  },
-  'Todo'
-)
-type Todo = t.TypeOf<typeof Todo>
-
 // Function for creating an empty task
-const todo = (id: number): Todo => ({
-  id,
+const emptyTodo = (seed: number): api.Todo => ({
+  _id: uuid.v1({ msecs: seed }),
   text: '',
   isDone: false,
   isFav: false
 })
 
 // Define how tasks should be ordered
-const ordTodoText = contramap<string, Todo>(todo => todo.text)(ordString) // Order by text
-const ordTodoIsDone = contramap<boolean, Todo>(todo => todo.isDone)(ordBoolean) // Order by isDone
-const ordTask = getSemigroup<Todo>().concat(ordTodoIsDone, ordTodoText) // Combine both ordering strategies
+const ordTodoText = contramap<string, api.Document<api.Todo>>(todo => todo.text)(ordString) // Order by text
+const ordTodoIsDone = contramap<boolean, api.Document<api.Todo>>(todo => todo.isDone)(ordBoolean) // Order by isDone
+const ordTask = getSemigroup<api.Document<api.Todo>>().concat(ordTodoIsDone, ordTodoText) // Combine both ordering strategies
 const sortTodos = A.sort(ordTask)
 
 // Util
-const groupTasksBy = R.fromFoldableMap(getFirstSemigroup<Todo>(), A.array)
-// Determine the next task id by getting the maximum task id and add one. If empty return 1 as default value
-const nextTaskId = (tasks: Record<string, Todo>) =>
-  fold(getJoinSemigroup(ordNumber))(1, Object.values(tasks).map(task => task.id)) + 1
+const groupTasksBy = R.fromFoldableMap(getFirstSemigroup<api.Document<api.Todo>>(), A.array)
 
 // The single state tree used by the application
 interface Model {
-  current: Todo
-  todos: Record<string, Todo>
+  seed: number
+  current: api.Document<api.Todo> | api.Todo
+  todos: Record<string, api.Document<api.Todo>>
 }
 
 // Lenses for the `Model`
 const currentLens = Lens.fromProp<Model>()('current')
-const currentTextLens = currentLens.composeLens(Lens.fromProp<Todo>()('text'))
+const currentTextLens = currentLens.composeLens(Lens.fromProp<api.Document<api.Todo> | api.Todo>()('text'))
 const todosLens = Lens.fromProp<Model>()('todos')
-const todoByIdOptional = (id: number) => todosLens.composeLens(atRecord<Todo>().at(String(id))).composePrism(Prism.some())
+const todoByIdOptional = (id: string) =>
+  todosLens.composeLens(atRecord<api.Document<api.Todo>>().at(String(id))).composePrism(Prism.some())
+const todoByIdOptionalRev = (id: string) => todoByIdOptional(id).composeLens(Lens.fromProp<api.Document<api.Todo>>()('_rev'))
 
 // All actions that can happen in our application
 const Action = Union({
+  Api: of<api.Action>(),
   Add: of(),
-  Edit: of<{ todo: Todo }>(),
-  Load: of<{ response: http.HttpResponseEither<Todo[]> }>(),
-  ToggleDone: of<{ todo: Todo }>(),
-  ToggleFav: of<{ todo: Todo }>(),
-  Remove: of<{ todo: Todo }>(),
+  Edit: of<{ todo: api.Document<api.Todo> }>(),
+  ToggleDone: of<{ todo: api.Document<api.Todo> }>(),
+  ToggleFav: of<{ todo: api.Document<api.Todo> }>(),
+  Remove: of<{ todo: api.Document<api.Todo> }>(),
   UpdateText: of<{ text: string }>()
 })
 type Action = typeof Action.T
 
-// Commands
-// Load tasks from json file
-const load: cmd.Cmd<Action> = http.send(http.get(require('./tasks.json'), t.array(Todo)), response => Action.Load({ response }))
+interface Flags {
+  seed: number
+}
 
 // Generate the initial state of our application and trigger a command if wanted
-const init: [Model, cmd.Cmd<Action>] = [
-  {
-    current: todo(1),
-    todos: {}
-  },
-  load
-]
+const init = (flags: Flags): [Model, cmd.Cmd<Action>] => {
+  const seed = random.seed(flags.seed)
+  return [
+    {
+      seed: random.next(seed),
+      current: emptyTodo(seed),
+      todos: {}
+    },
+    cmd.cmd.map(api.load, Action.Api)
+  ]
+}
 
 const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
   Action.match(action, {
-    Add: () => {
-      // Add the new task to the existing tasks
-      const todos = pipe(
-        model.todos,
-        R.insertAt(String(model.current.id), model.current)
-      )
-      // Generate the new current task based on the newly created tasks record to determine the next possible id
-      const current = todo(nextTaskId(todos))
-      return [
-        {
-          current,
-          todos
-        },
-        cmd.none
-      ]
-    },
+    Api: action =>
+      api.Action.match(action, {
+        Add: ({ todo, response }) =>
+          pipe(
+            response,
+            E.fold(
+              () => [model, cmd.none],
+              response => [
+                {
+                  ...model,
+                  seed: random.next(model.seed),
+                  current: emptyTodo(model.seed),
+                  todos: R.insertAt(response.body.id, {
+                    ...todo,
+                    _rev: response.body.rev
+                  })(model.todos)
+                },
+                cmd.none
+              ]
+            )
+          ),
+        Load: response =>
+          pipe(
+            response,
+            E.fold(
+              // If the response is an error do nothing by returning the current model
+              () => [model, cmd.none],
+              // Else evaluate the http response
+              response => {
+                const docs = response.body.rows.map(row => row.doc)
+                const todos = groupTasksBy(docs, todo => [String(todo._id), todo])
+                return [
+                  {
+                    ...model,
+                    todos
+                  },
+                  cmd.none
+                ]
+              }
+            )
+          ),
+        Remove: ({ todo, response }) =>
+          pipe(
+            response,
+            E.fold(() => [model, cmd.none], () => [todosLens.modify(R.deleteAt(String(todo._id)))(model), cmd.none])
+          ),
+        Update: ({ todo, response }) =>
+          pipe(
+            response,
+            E.fold(() => [model, cmd.none], response => [todoByIdOptionalRev(todo._id).set(response.body.rev)(model), cmd.none])
+          )
+      }),
+    Add: () => [
+      {
+        ...model,
+        seed: random.next(model.seed),
+        current: emptyTodo(model.seed)
+      },
+      cmd.cmd.map(api.add(model.current), Action.Api)
+    ],
     Edit: ({ todo }) => [currentLens.set(todo)(model), cmd.none],
-    Load: ({ response }) =>
-      pipe(
-        response,
-        E.fold(
-          // If the response is an error do nothing by returning the current model
-          () => [model, cmd.none],
-          // Else evaluate the http response
-          response => {
-            const todos = groupTasksBy(response.body, todo => [String(todo.id), todo])
-            const current = todo(nextTaskId(todos))
-            return [
-              {
-                current,
-                todos
-              },
-              cmd.none
-            ]
-          }
-        )
-      ),
-    ToggleDone: ({ todo }) => [todoByIdOptional(todo.id).modify(todo => ({ ...todo, isDone: !todo.isDone }))(model), cmd.none],
-    ToggleFav: ({ todo }) => [todoByIdOptional(todo.id).modify(todo => ({ ...todo, isFav: !todo.isFav }))(model), cmd.none],
-    Remove: ({ todo }) => [todosLens.modify(R.deleteAt(String(todo.id)))(model), cmd.none],
+    ToggleDone: ({ todo }) => {
+      const updated = { ...todo, isDone: !todo.isDone }
+      return [todoByIdOptional(todo._id).set(updated)(model), cmd.cmd.map(api.update(updated), Action.Api)]
+    },
+    ToggleFav: ({ todo }) => {
+      const updated = { ...todo, isFav: !todo.isFav }
+      return [todoByIdOptional(todo._id).set(updated)(model), cmd.cmd.map(api.update(updated), Action.Api)]
+    },
+    Remove: ({ todo }) => [model, cmd.cmd.map(api.remove(todo), Action.Api)],
     UpdateText: ({ text }) => [currentTextLens.set(text)(model), cmd.none],
     default: () => [model, cmd.none]
   })
@@ -136,8 +160,7 @@ const view = (model: Model) => {
   const todos = sortTodos(Object.values(model.todos))
   const done = todos.filter(todo => todo.isDone).length
   const total = todos.length
-  // If the current todo id is equal to a todo that already exists in todos we are editing
-  const isEditing = R.hasOwnProperty(String(model.current.id), model.todos)
+  const isEditing = '_rev' in model.current
 
   return (dispatch: platform.Dispatch<Action>) => (
     <div className="card">
@@ -159,7 +182,7 @@ const view = (model: Model) => {
         {total === 0 ? <EmptyTask /> : null}
         {todos.map(todo => (
           <TodoComponent
-            key={todo.id}
+            key={todo._id}
             {...todo}
             onEdit={() => dispatch(Action.Edit({ todo }))}
             onRemove={() => dispatch(Action.Remove({ todo }))}
@@ -172,8 +195,13 @@ const view = (model: Model) => {
   )
 }
 
-const app = html.program(init, update, view)
+const app = html.programWithFlags(init, update, view)
 
-html.run(app, dom => {
-  ReactDOM.render(dom, document.getElementById('app'))
-})
+html.run(
+  app({
+    seed: Date.now() * Math.random()
+  }),
+  dom => {
+    ReactDOM.render(dom, document.getElementById('app'))
+  }
+)

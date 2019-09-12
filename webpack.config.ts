@@ -117,6 +117,9 @@ const config: Configuration = {
           to: '/'
         }
       ]
+    },
+    proxy: {
+      '/todos': 'http://localhost:3000'
     }
   }
 }
