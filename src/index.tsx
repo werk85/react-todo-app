@@ -113,43 +113,32 @@ const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
               ]
             )
           ),
-        Change: change =>
-          pipe(
-            change,
-            O.fromEither,
-            O.map(change => change.doc),
-            O.filter((doc): doc is api.Document<api.Todo> => !('_deleted' in doc)),
-            O.fold(
-              () => [model, cmd.none],
-              doc => [
-                pipe(
-                  model,
-                  todosOptional.modify(R.insertAt(doc._id, doc))
-                ),
-                cmd.none
-              ]
-            )
-          ),
-        Load: response =>
-          pipe(
-            response,
-            E.fold(
-              // If the response is an error do nothing by returning the current model
-              () => [model, cmd.none],
-              // Else evaluate the http response
-              response => {
-                const docs = response.body.rows.map(row => row.doc)
-                const todos = groupTasksBy(docs, todo => [todo._id, todo])
-                return [
-                  pipe(
-                    model,
-                    todosLens.set(O.some(todos))
-                  ),
-                  cmd.none
-                ]
-              }
-            )
-          ),
+        Change: E.fold(
+          () => [model, cmd.none],
+          ({ doc }) => [
+            pipe(
+              model,
+              todosOptional.modify('_deleted' in doc ? R.deleteAt(doc._id) : R.insertAt(doc._id, doc))
+            ),
+            cmd.none
+          ]
+        ),
+        Load: E.fold(
+          // If the response is an error do nothing by returning the current model
+          () => [model, cmd.none],
+          // Else evaluate the http response
+          response => {
+            const docs = response.body.rows.map(row => row.doc)
+            const todos = groupTasksBy(docs, todo => [todo._id, todo])
+            return [
+              pipe(
+                model,
+                todosLens.set(O.some(todos))
+              ),
+              cmd.none
+            ]
+          }
+        ),
         Remove: ({ todo, response }) =>
           pipe(
             response,
