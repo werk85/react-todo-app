@@ -1,11 +1,58 @@
-# Aufgabe 4
+# Aufgabe 5
 
-Erstelle ein Verzeichnis `src/components` und zerlege das Template in die folgenden Komponenten.
+Speichere die Todos im LocalStorage mit Hilfe des `localStorage` Moduls von `effe-ts`. Erstelle hierzu ein [io-ts](https://github.com/gcanti/io-ts) Objekt mit dessen hilfe dein `Todo` Objekt kodiert (`encode`) und dekodiert (`decode`) werden kann.
 
- * `Title` - Beinhaltet alles innerhalb des `card-header`s
- * `TodoForm` - Beinhaltet das Inputfeld und den `Add` Button
- * `Todo` - Beinhaltet das `li` Element und seine Kinder
+## Beispiel
 
-Verwende die neu angelegten Komponenten in der `view` Funktion.
+```ts
+import { cmd, localStorage } from 'effe-ts'
+import * as t from 'io-ts'
+import * as E from 'fp-ts/lib/Either'
+import * as O from 'fp-ts/lib/Option'
 
-Achte dabei das die neu angelegten Komponenten keine Referenz zum `Model` oder `dispatch` Funktion haben dürfen um sie maximal wiederverwendbar zu machen. Übergebe entsprechend alle nötigen Variablen und Callback-Funktionen über entsprechende `props`.
+// Our model we want to write to our localStorage
+const Counter = t.number
+type Counter = t.TypeOf<typeof Counter>
+
+const Action =
+  | { type: 'Load', payload: E.Either<LocalStorageError, O.Option<Counter>> }
+  /* ... my other actions */
+
+// The entity object of our Counter object. The first parameter describes the name inside of Local Storage
+const entity = localStorage.entity('counter', Counter)
+
+// cmd.Cmd<Action>
+const load = localStorage.load(entity, e => ({ type: 'Load', payload: e }))
+
+// (value: number) => cmd.Cmd<never>
+const save = localStorage.save(entity)
+
+// Usage in `init` and `update` Function
+
+const init = [
+  {
+    ...
+  },
+  load // Load on startup
+]
+
+const update = (action, model): [Model, cmd.Cmd<Action>] => {
+  switch (action.type) {
+    case 'Load':
+      return [
+        pipe(
+          action.payload,
+          E.fold(
+            () => [model, cmd.none],
+            O.fold(
+              () => [model, cmd.none],
+              counter => [/* do something with counter in model */, cmd.none]
+            )
+          )
+        )
+      ]
+  }
+}
+```
+
+Siehe [Referenzdokumentation](https://gcanti.github.io/fp-ts/modules/) für `Option` und `Either`.
