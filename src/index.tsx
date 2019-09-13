@@ -10,6 +10,7 @@ import { cmd, html, platform } from 'effe-ts'
 import { Union, of } from 'ts-union'
 import * as O from 'fp-ts/lib/Option'
 import * as NEA from 'fp-ts/lib/NonEmptyArray'
+import * as rx from 'rxjs/operators'
 import * as random from './random'
 import { Title } from './components/Title'
 import { TodoForm } from './components/TodoForm'
@@ -107,6 +108,23 @@ const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
                       _rev: response.body.rev
                     })
                   )
+                ),
+                cmd.none
+              ]
+            )
+          ),
+        Change: change =>
+          pipe(
+            change,
+            O.fromEither,
+            O.map(change => change.doc),
+            O.filter((doc): doc is api.Document<api.Todo> => !('_deleted' in doc)),
+            O.fold(
+              () => [model, cmd.none],
+              doc => [
+                pipe(
+                  model,
+                  todosOptional.modify(R.insertAt(doc._id, doc))
                 ),
                 cmd.none
               ]
@@ -291,7 +309,13 @@ const view = (model: Model) => {
   )
 }
 
-const app = html.programWithFlags(init, update, view)
+const app = html.programWithFlags(init, update, view, model =>
+  pipe(
+    model.todos,
+    O.fold(api.changes.stop, api.changes.start),
+    rx.map(Action.Api)
+  )
+)
 
 html.run(
   app({
