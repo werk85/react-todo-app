@@ -6,7 +6,7 @@
   "scripts": {
     "deploy": "yarn build && gh-pages -d dist -m \"app updated [skip ci]\"",
     "build": "webpack -p",
-    "start": "concurrently --kill-others \"webpack-dev-server\" \"pouchdb-server --port 3000 --dir .pouchdb\"",
+    "start": "concurrently --raw --kill-others \"webpack-dev-server\" \"pouchdb-server --port 3000 --dir .pouchdb\"",
     "lint": "eslint --ext .ts,.tsx src",
     "lint:fix": "eslint --ext .ts,.tsx --fix src"
   },
