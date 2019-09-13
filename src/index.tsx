@@ -37,7 +37,7 @@ const ordTodo = getSemigroup<api.Document<api.Todo>>().concat(ordTodoIsDone, ord
 const sortTodos = A.sort(ordTodo)
 
 // Util
-const groupTasksBy = R.fromFoldableMap(getFirstSemigroup<api.Document<api.Todo>>(), A.array)
+const groupTodosBy = R.fromFoldableMap(getFirstSemigroup<api.Document<api.Todo>>(), A.array)
 
 // The single state tree used by the application
 interface Model {
@@ -53,7 +53,7 @@ const seedLens = Lens.fromProp<Model>()('seed')
 const todosLens = Lens.fromProp<Model>()('todos')
 const todosOptional = todosLens.composePrism(Prism.some())
 const todoByIdOptional = (id: string) =>
-  todosOptional.composeLens(atRecord<api.Document<api.Todo>>().at(String(id))).composePrism(Prism.some())
+  todosOptional.composeLens(atRecord<api.Document<api.Todo>>().at(id)).composePrism(Prism.some())
 const todoByIdOptionalRev = (id: string) => todoByIdOptional(id).composeLens(Lens.fromProp<api.Document<api.Todo>>()('_rev'))
 
 // All actions that can happen in our application
@@ -129,7 +129,7 @@ const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
           // Else evaluate the http response
           response => {
             const docs = response.body.rows.map(row => row.doc)
-            const todos = groupTasksBy(docs, todo => [todo._id, todo])
+            const todos = groupTodosBy(docs, todo => [todo._id, todo])
             return [
               pipe(
                 model,
