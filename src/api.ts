@@ -76,24 +76,8 @@ export const load: cmd.Cmd<Action> = http.send(http.get('/todos/_all_docs?includ
 export const add = (todo: Todo) =>
   http.send(http.post('/todos', Todo.encode(todo), Response), response => Action.Add({ todo, response }))
 export const remove = (todo: Document<Todo>) =>
-  http.send(
-    {
-      method: 'DELETE',
-      url: `/todos/${todo._id}?_rev=${todo._rev}`,
-      decoder: Response
-    },
-    response => Action.Remove({ todo, response })
-  )
+  http.send(http.del(`/todos/${todo._id}?_rev=${todo._rev}`, Response), response => Action.Remove({ todo, response }))
 export const update = (todo: Document<Todo>) =>
-  http.send(
-    {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      url: `/todos/${todo._id}?rev=${todo._rev}`,
-      body: Document(Todo).encode(todo),
-      decoder: Response
-    },
-    response => Action.Update({ todo, response })
+  http.send(http.put(`/todos/${todo._id}?rev=${todo._rev}`, Document(Todo).encode(todo), Response), response =>
+    Action.Update({ todo, response })
   )

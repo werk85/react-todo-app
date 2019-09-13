@@ -8,11 +8,14 @@ import { getFirstSemigroup } from 'fp-ts/lib/Semigroup'
 import * as A from 'fp-ts/lib/Array'
 import { cmd, html, platform } from 'effe-ts'
 import { Union, of } from 'ts-union'
+import * as O from 'fp-ts/lib/Option'
+import * as NEA from 'fp-ts/lib/NonEmptyArray'
 import * as random from './random'
 import { Title } from './components/Title'
 import { TodoForm } from './components/TodoForm'
-import { EmptyTask } from './components/EmptyTask'
-import { Todo as TodoComponent } from './components/Todo'
+import { EmptyTodos } from './components/EmptyTodos'
+import { LoadingTodos } from './components/LoadingTodos'
+import { Todo } from './components/Todo'
 import * as api from './api'
 import uuid from 'uuid'
 import * as ReactDOM from 'react-dom'
@@ -29,8 +32,8 @@ const emptyTodo = (seed: number): api.Todo => ({
 // Define how tasks should be ordered
 const ordTodoText = contramap<string, api.Document<api.Todo>>(todo => todo.text)(ordString) // Order by text
 const ordTodoIsDone = contramap<boolean, api.Document<api.Todo>>(todo => todo.isDone)(ordBoolean) // Order by isDone
-const ordTask = getSemigroup<api.Document<api.Todo>>().concat(ordTodoIsDone, ordTodoText) // Combine both ordering strategies
-const sortTodos = A.sort(ordTask)
+const ordTodo = getSemigroup<api.Document<api.Todo>>().concat(ordTodoIsDone, ordTodoText) // Combine both ordering strategies
+const sortTodos = A.sort(ordTodo)
 
 // Util
 const groupTasksBy = R.fromFoldableMap(getFirstSemigroup<api.Document<api.Todo>>(), A.array)
@@ -39,15 +42,17 @@ const groupTasksBy = R.fromFoldableMap(getFirstSemigroup<api.Document<api.Todo>>
 interface Model {
   seed: number
   current: api.Document<api.Todo> | api.Todo
-  todos: Record<string, api.Document<api.Todo>>
+  todos: O.Option<Record<string, api.Document<api.Todo>>>
 }
 
 // Lenses for the `Model`
 const currentLens = Lens.fromProp<Model>()('current')
 const currentTextLens = currentLens.composeLens(Lens.fromProp<api.Document<api.Todo> | api.Todo>()('text'))
+const seedLens = Lens.fromProp<Model>()('seed')
 const todosLens = Lens.fromProp<Model>()('todos')
+const todosOptional = todosLens.composePrism(Prism.some())
 const todoByIdOptional = (id: string) =>
-  todosLens.composeLens(atRecord<api.Document<api.Todo>>().at(String(id))).composePrism(Prism.some())
+  todosOptional.composeLens(atRecord<api.Document<api.Todo>>().at(String(id))).composePrism(Prism.some())
 const todoByIdOptionalRev = (id: string) => todoByIdOptional(id).composeLens(Lens.fromProp<api.Document<api.Todo>>()('_rev'))
 
 // All actions that can happen in our application
@@ -73,9 +78,12 @@ const init = (flags: Flags): [Model, cmd.Cmd<Action>] => {
     {
       seed: random.next(seed),
       current: emptyTodo(seed),
-      todos: {}
+      todos: O.none
     },
-    cmd.cmd.map(api.load, Action.Api)
+    pipe(
+      api.load,
+      cmd.map(Action.Api)
+    )
   ]
 }
 
@@ -89,15 +97,17 @@ const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
             E.fold(
               () => [model, cmd.none],
               response => [
-                {
-                  ...model,
-                  seed: random.next(model.seed),
-                  current: emptyTodo(model.seed),
-                  todos: R.insertAt(response.body.id, {
-                    ...todo,
-                    _rev: response.body.rev
-                  })(model.todos)
-                },
+                pipe(
+                  model,
+                  seedLens.modify(random.next),
+                  currentLens.set(emptyTodo(model.seed)),
+                  todosOptional.modify(
+                    R.insertAt(response.body.id, {
+                      ...todo,
+                      _rev: response.body.rev
+                    })
+                  )
+                ),
                 cmd.none
               ]
             )
@@ -111,12 +121,12 @@ const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
               // Else evaluate the http response
               response => {
                 const docs = response.body.rows.map(row => row.doc)
-                const todos = groupTasksBy(docs, todo => [String(todo._id), todo])
+                const todos = groupTasksBy(docs, todo => [todo._id, todo])
                 return [
-                  {
-                    ...model,
-                    todos
-                  },
+                  pipe(
+                    model,
+                    todosLens.set(O.some(todos))
+                  ),
                   cmd.none
                 ]
               }
@@ -125,48 +135,117 @@ const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
         Remove: ({ todo, response }) =>
           pipe(
             response,
-            E.fold(() => [model, cmd.none], () => [todosLens.modify(R.deleteAt(String(todo._id)))(model), cmd.none])
+            E.fold(
+              () => [model, cmd.none],
+              () => [
+                pipe(
+                  model,
+                  todosOptional.modify(R.deleteAt(todo._id))
+                ),
+                cmd.none
+              ]
+            )
           ),
         Update: ({ todo, response }) =>
           pipe(
             response,
-            E.fold(() => [model, cmd.none], response => [todoByIdOptionalRev(todo._id).set(response.body.rev)(model), cmd.none])
+            E.fold(
+              () => [model, cmd.none],
+              response => [
+                pipe(
+                  model,
+                  todoByIdOptionalRev(todo._id).set(response.body.rev)
+                ),
+                cmd.none
+              ]
+            )
           )
       }),
     Add: () => [
-      {
-        ...model,
-        seed: random.next(model.seed),
-        current: emptyTodo(model.seed)
-      },
-      cmd.cmd.map(api.add(model.current), Action.Api)
+      pipe(
+        model,
+        seedLens.modify(random.next),
+        currentLens.set(emptyTodo(model.seed))
+      ),
+      pipe(
+        api.add(model.current),
+        cmd.map(Action.Api)
+      )
     ],
-    Edit: ({ todo }) => [currentLens.set(todo)(model), cmd.none],
+    Edit: ({ todo }) => [
+      pipe(
+        model,
+        currentLens.set(todo)
+      ),
+      cmd.none
+    ],
     ToggleDone: ({ todo }) => {
       const updated = { ...todo, isDone: !todo.isDone }
-      return [todoByIdOptional(todo._id).set(updated)(model), cmd.cmd.map(api.update(updated), Action.Api)]
+      return [
+        pipe(
+          model,
+          todoByIdOptional(todo._id).set(updated)
+        ),
+        pipe(
+          api.update(updated),
+          cmd.map(Action.Api)
+        )
+      ]
     },
     ToggleFav: ({ todo }) => {
       const updated = { ...todo, isFav: !todo.isFav }
-      return [todoByIdOptional(todo._id).set(updated)(model), cmd.cmd.map(api.update(updated), Action.Api)]
+      return [
+        pipe(
+          model,
+          todoByIdOptional(todo._id).set(updated)
+        ),
+        pipe(
+          api.update(updated),
+          cmd.map(Action.Api)
+        )
+      ]
     },
-    Remove: ({ todo }) => [model, cmd.cmd.map(api.remove(todo), Action.Api)],
-    UpdateText: ({ text }) => [currentTextLens.set(text)(model), cmd.none],
+    Remove: ({ todo }) => [
+      model,
+      pipe(
+        api.remove(todo),
+        cmd.map(Action.Api)
+      )
+    ],
+    UpdateText: ({ text }) => [
+      pipe(
+        model,
+        currentTextLens.set(text)
+      ),
+      cmd.none
+    ],
     default: () => [model, cmd.none]
   })
 
 const view = (model: Model) => {
-  // Convert todos record to array and sort
-  const todos = sortTodos(Object.values(model.todos))
-  const done = todos.filter(todo => todo.isDone).length
-  const total = todos.length
+  // Convert todos record to non empty array and sort it
+  // The result is a Option<Option<NonEmptyArray<Todo>>> type
+  // The most outer Option signalize the loading state. The inner Option signalize if the array is empty or not
+  // and the internal array has at least one Todo element
+  const todos = pipe(
+    model.todos,
+    O.map(todos => NEA.fromArray(sortTodos(Object.values(todos))))
+  )
+  const stats = pipe(
+    todos,
+    O.flatten,
+    O.map(todos => ({
+      done: todos.filter(todo => todo.isDone).length,
+      total: todos.length
+    }))
+  )
   const isEditing = '_rev' in model.current
 
   return (dispatch: platform.Dispatch<Action>) => (
     <div className="card">
       <div className="card-header">
         <h3 className="card-title">
-          <Title done={done} total={total} />
+          <Title stats={stats} />
         </h3>
       </div>
       <div className="card-body">
@@ -178,18 +257,35 @@ const view = (model: Model) => {
         />
       </div>
       <ul className="list-group list-group-flush">
-        {/* If we have no tasks we show a placeholder */}
-        {total === 0 ? <EmptyTask /> : null}
-        {todos.map(todo => (
-          <TodoComponent
-            key={todo._id}
-            {...todo}
-            onEdit={() => dispatch(Action.Edit({ todo }))}
-            onRemove={() => dispatch(Action.Remove({ todo }))}
-            onToggleDone={() => dispatch(Action.ToggleDone({ todo }))}
-            onToggleFav={() => dispatch(Action.ToggleFav({ todo }))}
-          />
-        ))}
+        {pipe(
+          // Unpacking the todos Option<Option<NonEmptyArray<Todo>>> object
+          todos,
+          O.fold(
+            // If the most outer Option is none the app is loading the todos
+            () => <LoadingTodos />,
+            // Else we most outer Option is some and we need evaluate the inner Option.
+            // Note: `fold` returns a new function that accepts the Option<NonEmptyArray<Todo>> type so the `pipe` call would be redundant
+            O.fold(
+              // If the the inner Option is none the array is empty
+              () => <EmptyTodos />,
+              // Else the todos were loaded and the array is not empty
+              todos => (
+                <>
+                  {todos.map(todo => (
+                    <Todo
+                      key={todo._id}
+                      {...todo}
+                      onEdit={() => dispatch(Action.Edit({ todo }))}
+                      onRemove={() => dispatch(Action.Remove({ todo }))}
+                      onToggleDone={() => dispatch(Action.ToggleDone({ todo }))}
+                      onToggleFav={() => dispatch(Action.ToggleFav({ todo }))}
+                    />
+                  ))}
+                </>
+              )
+            )
+          )
+        )}
       </ul>
     </div>
   )

@@ -9,10 +9,13 @@ module.exports = {
     }
   },
   settings: {
-    "import/resolver": {
-      typescript: {
+    'import/resolver': {
+      ts: {
         directory: 'src'
       }
-    }
+    },
+    'import/ignore': [
+      'uuid'
+    ]
   }
 }
