@@ -56,3 +56,7 @@ const update = (action, model): [Model, cmd.Cmd<Action>] => {
 ```
 
 Siehe [Referenzdokumentation](https://gcanti.github.io/fp-ts/modules/) für `Option` und `Either`.
+
+# Zusatzaufgabe
+
+Verwende zur Erstellung deiner Actions das [ts-union](https://github.com/twop/ts-union) Modul und ersetze alle `switch/case` Statements durch die `match` Funktion.
