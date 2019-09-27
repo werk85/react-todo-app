@@ -15,14 +15,14 @@ const Counter = t.number
 type Counter = t.TypeOf<typeof Counter>
 
 const Action =
-  | { type: 'Load', payload: E.Either<LocalStorageError, O.Option<Counter>> }
+  | { type: 'Load', payload: E.Either<localStorage.LocalStorageError, O.Option<Counter>> }
   /* ... my other actions */
 
 // The entity object of our Counter object. The first parameter describes the name inside of Local Storage
 const entity = localStorage.entity('counter', Counter)
 
 // cmd.Cmd<Action>
-const load = localStorage.load(entity, e => ({ type: 'Load', payload: e }))
+const load = localStorage.load(entity, (e): Action => ({ type: 'Load', payload: e }))
 
 // (value: number) => cmd.Cmd<never>
 const save = localStorage.save(entity)
@@ -39,18 +39,16 @@ const init = [
 const update = (action, model): [Model, cmd.Cmd<Action>] => {
   switch (action.type) {
     case 'Load':
-      return [
-        pipe(
-          action.payload,
-          E.fold(
+      return pipe(
+        action.payload,
+        E.fold(
+          () => [model, cmd.none],
+          O.fold(
             () => [model, cmd.none],
-            O.fold(
-              () => [model, cmd.none],
-              counter => [/* do something with counter in model */, cmd.none]
-            )
+            counter => [/* do something with counter in model */, cmd.none]
           )
         )
-      ]
+      )
   }
 }
 ```
