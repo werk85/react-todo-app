@@ -10,17 +10,23 @@ export interface Props {
 }
 
 export const TodoEdit: React.FunctionComponent<Props> = ({ text, onChange, onSave, onCancel }) => (
-  <li className="task-container list-group-item d-flex justify-content-between align-items-center">
-    <div className="form-group">
-      <input className="form-control" type="text" value={text} onChange={onChange} />
-    </div>
-    <div>
-      <a href="#" className="btn-right" onClick={onCancel}>
-        <FontAwesomeIcon icon={faTimes} />
-      </a>
-      <a href="#" className="btn-right" onClick={onSave}>
-        <FontAwesomeIcon icon={faSave} />
-      </a>
-    </div>
+  <li className="task-container list-group-item">
+    <form
+      onSubmit={event => {
+        onSave()
+        event.preventDefault()
+      }}>
+      <div className="input-group">
+        <input className="form-control" type="text" value={text} onChange={onChange} />
+        <div className="input-group-append">
+          <button className="btn btn-success" type="submit">
+            <FontAwesomeIcon icon={faSave} />
+          </button>
+          <button className="btn btn-danger" type="button" onClick={onCancel}>
+            <FontAwesomeIcon icon={faTimes} />
+          </button>
+        </div>
+      </div>
+    </form>
   </li>
 )

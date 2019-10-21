@@ -7,7 +7,6 @@ import { fromFetch } from 'rxjs/fetch'
 import * as E from 'fp-ts/lib/Either'
 import * as rx from 'rxjs/operators'
 import { pipe } from 'fp-ts/lib/pipeable'
-import { Lens } from 'monocle-ts'
 
 export const Todo = t.interface(
   {
