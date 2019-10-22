@@ -4,15 +4,14 @@ import { pipe } from 'fp-ts/lib/pipeable'
 import { atRecord } from 'monocle-ts/lib/At/Record'
 import { Prism, Lens } from 'monocle-ts/lib'
 import * as E from 'fp-ts/lib/Either'
-import { getFirstSemigroup } from 'fp-ts/lib/Semigroup'
 import * as A from 'fp-ts/lib/Array'
-import { tuple } from 'fp-ts/lib/function'
-import { cmd, html, platform } from 'effe-ts'
+import { cmd, html, state, platform } from 'effe-ts'
 import { Union, of } from 'ts-union'
 import * as O from 'fp-ts/lib/Option'
 import * as NEA from 'fp-ts/lib/NonEmptyArray'
 import * as rx from 'rxjs/operators'
 import { fold } from 'fp-ts/lib/Monoid'
+import * as T from 'fp-ts/lib/Tuple'
 import { Title } from './components/Title'
 import { EmptyTodos } from './components/EmptyTodos'
 import { LoadingTodos } from './components/LoadingTodos'
@@ -28,13 +27,12 @@ const ordTodoIsDone = contramap<boolean, Todo.Model>(Todo.isDoneLens.get)(ordBoo
 const ordTodo = getSemigroup<Todo.Model>().concat(ordTodoIsDone, ordTodoText) // Combine both ordering strategies
 const sortTodos = A.sort(contramap<Todo.Model, [string, Todo.Model]>(([_, todo]) => todo)(ordTodo))
 
-// Util
-const groupTodosBy = R.fromFoldableMap(getFirstSemigroup<Todo.Model>(), A.array)
+interface Todos extends Record<string, Todo.Model> {}
 
 // The single state tree used by the application
 interface Model {
   current: TodoForm.Model
-  todos: O.Option<Record<string, Todo.Model>>
+  todos: O.Option<Todos>
 }
 
 // Lenses for the `Model`
@@ -43,6 +41,11 @@ const todosLens = Lens.fromProp<Model>()('todos')
 const todosOptional = todosLens.composePrism(Prism.some())
 const todoByIdOptional = (id: string) => todosOptional.composeLens(atRecord<Todo.Model>().at(id)).composePrism(Prism.some())
 const todoByIdOptionalRev = (id: string) => todoByIdOptional(id).composeLens(Todo.revLens)
+const insertTodo = (id: string, model: Model) => (todoModel: Todo.Model): Model =>
+  pipe(
+    model,
+    todosOptional.modify(R.insertAt(id, todoModel))
+  )
 
 // All actions that can happen in our application
 const Action = Union({
@@ -52,171 +55,148 @@ const Action = Union({
 })
 type Action = typeof Action.T
 const monoidCmd = cmd.getMonoid<Action>()
+const monoidState = state.getApplicative<Action>()
 
 interface Flags {
   seed: number
 }
 
 // Generate the initial state of our application and trigger a command if wanted
-const init = (flags: Flags): [Model, cmd.Cmd<Action>] => {
-  const [currentModel, currentCmd] = TodoForm.init(flags.seed)
-  return [
-    {
-      current: currentModel,
-      todos: O.none
-    },
-    fold(monoidCmd)([
-      pipe(
-        api.load,
-        cmd.map(Action.Api)
-      ),
-      pipe(
-        currentCmd,
-        cmd.map(Action.TodoForm)
-      )
-    ])
-  ]
-}
+const init = (flags: Flags): [Model, cmd.Cmd<Action>] =>
+  pipe(
+    TodoForm.init(flags.seed),
+    T.bimap(
+      todoCmd =>
+        fold(monoidCmd)([
+          pipe(
+            todoCmd,
+            cmd.map(Action.TodoForm)
+          ),
+          pipe(
+            api.load,
+            cmd.map(Action.Api)
+          )
+        ]),
+      current => ({
+        current,
+        todos: O.none
+      })
+    )
+  )
 
 const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
   Action.match(action, {
     Api: action =>
       api.Action.match(action, {
-        Add: ({ todo, response }) =>
+        Add: (todo, response) =>
           pipe(
             response,
             E.fold(
-              () => [model, cmd.none],
-              response => {
-                const [todoModel, todoCmd] = Todo.init({
-                  ...todo,
-                  _rev: response.body.rev
-                })
-                return [
-                  pipe(
-                    model,
-                    todosOptional.modify(R.insertAt(response.body.id, todoModel))
-                  ),
-                  pipe(
-                    todoCmd,
-                    cmd.map(action => Action.Todo(todo._id, action))
-                  )
-                ]
-              }
+              () => state.of(model),
+              response =>
+                pipe(
+                  Todo.init({
+                    ...todo,
+                    _rev: response.body.rev
+                  }),
+                  T.bimap(cmd.map(action => Action.Todo(todo._id, action)), insertTodo(todo._id, model))
+                )
             )
           ),
         Change: E.fold(
-          () => [model, cmd.none] as [Model, cmd.Cmd<Action>],
+          () => state.of(model),
           ({ doc }) => {
             if ('_deleted' in doc) {
-              return [
+              return state.of(
                 pipe(
                   model,
                   todosOptional.modify(R.deleteAt(doc._id))
-                ),
-                cmd.none
-              ]
-            }
-            const [todoModel, todoCmd] = Todo.init(doc)
-            return [
-              pipe(
-                model,
-                todosOptional.modify(R.insertAt(doc._id, todoModel))
-              ),
-              pipe(
-                todoCmd,
-                cmd.map(action => Action.Todo(doc._id, action))
+                )
               )
-            ]
+            } else {
+              return pipe(
+                Todo.init(doc),
+                T.bimap(cmd.map(action => Action.Todo(doc._id, action)), insertTodo(doc._id, model))
+              )
+            }
           }
         ),
         Load: E.fold(
           // If the response is an error do nothing by returning the current model
-          () => [model, cmd.none],
+          () => state.of(model),
           // Else evaluate the http response
-          response => {
-            const docs = response.body.rows.map(row => row.doc).map(doc => tuple(doc._id, ...Todo.init(doc)))
-            const todos = groupTodosBy(docs, ([id, todo]) => [id, todo])
-            const cmds = docs.map(([id, _, c]) =>
-              pipe(
-                c,
-                cmd.map(action => Action.Todo(id, action))
+          response =>
+            pipe(
+              response.body.rows.map(row => Todo.init(row.doc)),
+              A.reduce(state.of<Todos, Action>({}), (result, [todoModel, todoCmd]) => {
+                const id = pipe(
+                  todoModel,
+                  Todo.idLens.get
+                )
+                return monoidState.ap(
+                  [
+                    R.insertAt(id, todoModel),
+                    pipe(
+                      todoCmd,
+                      cmd.map(action => Action.Todo(id, action))
+                    )
+                  ],
+                  result
+                )
+              }),
+              T.map(todos =>
+                pipe(
+                  model,
+                  todosLens.set(O.some(todos))
+                )
               )
             )
-            return [
-              pipe(
-                model,
-                todosLens.set(O.some(todos))
-              ),
-              fold(monoidCmd)(cmds)
-            ]
-          }
         ),
-        Remove: ({ todo, response }) =>
-          pipe(
-            response,
-            E.fold(
-              () => [model, cmd.none],
-              () => [
-                pipe(
-                  model,
-                  todosOptional.modify(R.deleteAt(todo._id))
-                ),
-                cmd.none
-              ]
+        Remove: (todo, response) =>
+          state.of(
+            pipe(
+              response,
+              E.fold(
+                () => model,
+                () =>
+                  pipe(
+                    model,
+                    todosOptional.modify(R.deleteAt(todo._id))
+                  )
+              )
             )
           ),
-        Update: ({ todo, response }) =>
-          pipe(
-            response,
-            E.fold(
-              () => [model, cmd.none],
-              response => [
-                pipe(
-                  model,
-                  todoByIdOptionalRev(todo._id).set(response.body.rev)
-                ),
-                cmd.none
-              ]
-            )
-          )
+        default: () => state.of(model)
       }),
-    Todo: (id, action) => {
-      return pipe(
+    Todo: (id, action) =>
+      pipe(
         model,
         todoByIdOptional(id).getOption,
         O.fold(
-          () => [model, cmd.none],
-          todoModel => {
-            const [m, c] = Todo.update(action, todoModel)
-            return [
-              pipe(
-                model,
-                todoByIdOptional(id).set(m)
-              ),
-              pipe(
-                c,
-                cmd.map(action => Action.Todo(id, action))
+          () => state.of(model),
+          todoModel =>
+            pipe(
+              Todo.update(action, todoModel),
+              T.bimap(cmd.map(action => Action.Todo(id, action)), todoModel =>
+                pipe(
+                  model,
+                  todoByIdOptional(id).set(todoModel)
+                )
               )
-            ]
-          }
+            )
         )
-      )
-    },
-    TodoForm: action => {
-      const [m, c] = TodoForm.update(action, model.current)
-      return [
-        pipe(
-          model,
-          currentLens.set(m)
-        ),
-        pipe(
-          c,
-          cmd.map(Action.TodoForm)
+      ),
+    TodoForm: action =>
+      pipe(
+        TodoForm.update(action, model.current),
+        T.bimap(cmd.map(Action.TodoForm), formModel =>
+          pipe(
+            model,
+            currentLens.set(formModel)
+          )
         )
-      ]
-    },
-    default: () => [model, cmd.none]
+      ),
+    default: () => state.of(model)
   })
 
 const view = (model: Model) => {

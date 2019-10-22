@@ -1,5 +1,5 @@
 import { Union, of } from 'ts-union'
-import { cmd, platform } from 'effe-ts'
+import { cmd, platform, state } from 'effe-ts'
 import { not, identity } from 'fp-ts/lib/function'
 import { pipe } from 'fp-ts/lib/pipeable'
 import { Lens, Optional } from 'monocle-ts'
@@ -59,13 +59,13 @@ export const Action = Union({
 })
 export type Action = typeof Action.T
 
-export const init = (todo: api.Document<api.Todo>): [Model, cmd.Cmd<Action>] => [Model.None(todo), cmd.none]
+export const init = (todo: api.Document<api.Todo>): [Model, cmd.Cmd<Action>] => state.of(Model.None(todo))
 
 export const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
   Model.match(model, {
     Editing: (todo, text) =>
       Action.match(action, {
-        Cancel: () => [Model.None(todo), cmd.none],
+        Cancel: () => state.of(Model.None(todo)),
         Save: () => [
           Model.None({ ...todo, text }),
           pipe(
@@ -80,7 +80,7 @@ export const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =
           ),
           cmd.none
         ],
-        default: () => [model, cmd.none]
+        default: () => state.of(model)
       }),
     None: todo =>
       Action.match(action, {
@@ -92,19 +92,35 @@ export const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =
                 O.fromEither,
                 O.filter(change => change.doc._id === todo._id),
                 O.fold(
-                  () => [model, cmd.none],
-                  ({ doc }) => [
-                    pipe(
-                      model,
-                      revLens.set(doc._rev)
-                    ),
-                    cmd.none
-                  ]
+                  () => state.of(model),
+                  ({ doc }) =>
+                    state.of(
+                      pipe(
+                        model,
+                        revLens.set(doc._rev)
+                      )
+                    )
                 )
               ),
-            default: () => [model, cmd.none]
+            Update: (_, response) =>
+              state.of(
+                pipe(
+                  response,
+                  O.fromEither,
+                  O.filter(response => response.body.id === todo._id),
+                  O.fold(
+                    () => model,
+                    response =>
+                      pipe(
+                        model,
+                        revLens.set(response.body.rev)
+                      )
+                  )
+                )
+              ),
+            default: () => state.of(model)
           }),
-        Edit: () => [Model.Editing(todo, todo.text), cmd.none],
+        Edit: () => state.of(Model.Editing(todo, todo.text)),
         Remove: () => [
           model,
           pipe(
@@ -146,7 +162,7 @@ export const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =
             })
           ]
         },
-        default: () => [model, cmd.none]
+        default: () => state.of(model)
       })
   })
 

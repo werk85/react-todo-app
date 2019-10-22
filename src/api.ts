@@ -91,22 +91,22 @@ export interface Change<D> {
 }
 
 export const Action = Union({
-  Add: of<{ todo: Todo; response: http.HttpResponseEither<Response> }>(),
+  Add: of<Todo, http.HttpResponseEither<Response>>(),
   Change: of<E.Either<t.Errors, Change<Todo>>>(),
   Load: of<http.HttpResponseEither<AllDocsResponse<Todo>>>(),
-  Remove: of<{ todo: Todo; response: http.HttpResponseEither<Response> }>(),
-  Update: of<{ todo: Todo; response: http.HttpResponseEither<Response> }>()
+  Remove: of<Todo, http.HttpResponseEither<Response>>(),
+  Update: of<Todo, http.HttpResponseEither<Response>>()
 })
 export type Action = typeof Action.T
 
 export const load: cmd.Cmd<Action> = http.send(http.get('/todos/_all_docs?include_docs=true', AllDocsResponse(Todo)), Action.Load)
 export const add = (todo: Todo) =>
-  http.send(http.put(`/todos/${todo._id}`, Todo.encode(todo), Response), response => Action.Add({ todo, response }))
+  http.send(http.put(`/todos/${todo._id}`, Todo.encode(todo), Response), response => Action.Add(todo, response))
 export const remove = (todo: Document<Todo>) =>
-  http.send(http.del(`/todos/${todo._id}?_rev=${todo._rev}`, Response), response => Action.Remove({ todo, response }))
+  http.send(http.del(`/todos/${todo._id}?_rev=${todo._rev}`, Response), response => Action.Remove(todo, response))
 export const update = (todo: Document<Todo>) =>
   http.send(http.put(`/todos/${todo._id}?rev=${todo._rev}`, Document(Todo).encode(todo), Response), response =>
-    Action.Update({ todo, response })
+    Action.Update(todo, response)
   )
 
 const changes$ = new Subject<Action>()
