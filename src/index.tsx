@@ -22,7 +22,8 @@ import * as ReactDOM from 'react-dom'
 import * as React from 'react'
 
 // Define how tasks should be ordered
-const ordTodoText = contramap<string, Todo.Model>(Todo.textLens.get)(ordString) // Order by text
+const ordCaseInsensitiveString = contramap<string, string>(str => str.toLocaleLowerCase())(ordString)
+const ordTodoText = contramap<string, Todo.Model>(Todo.textLens.get)(ordCaseInsensitiveString) // Order by text
 const ordTodoIsDone = contramap<boolean, Todo.Model>(Todo.isDoneLens.get)(ordBoolean) // Order by isDone
 const ordTodo = getSemigroup<Todo.Model>().concat(ordTodoIsDone, ordTodoText) // Combine both ordering strategies
 const sortTodos = A.sort(contramap<Todo.Model, [string, Todo.Model]>(([_, todo]) => todo)(ordTodo))
@@ -40,7 +41,6 @@ const currentLens = Lens.fromProp<Model>()('current')
 const todosLens = Lens.fromProp<Model>()('todos')
 const todosOptional = todosLens.composePrism(Prism.some())
 const todoByIdOptional = (id: string) => todosOptional.composeLens(atRecord<Todo.Model>().at(id)).composePrism(Prism.some())
-const todoByIdOptionalRev = (id: string) => todoByIdOptional(id).composeLens(Todo.revLens)
 const insertTodo = (id: string, model: Model) => (todoModel: Todo.Model): Model =>
   pipe(
     model,
