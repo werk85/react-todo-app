@@ -19,7 +19,7 @@ export const TodoEdit: React.FunctionComponent<Props> = ({ text, onChange, onSav
       <div className="input-group">
         <input className="form-control" type="text" value={text} onChange={onChange} />
         <div className="input-group-append">
-          <button className="btn btn-success" type="submit">
+          <button className="btn btn-success" type="submit" disabled={text.length === 0}>
             <FontAwesomeIcon icon={faSave} />
           </button>
           <button className="btn btn-danger" type="button" onClick={onCancel}>
