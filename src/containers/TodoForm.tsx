@@ -1,4 +1,4 @@
-import { cmd, platform } from 'effe-ts'
+import { cmdr, platform, stater } from 'effe-ts'
 import { Union, of } from 'ts-union'
 import { Lens } from 'monocle-ts'
 import { pipe } from 'fp-ts/lib/pipeable'
@@ -31,18 +31,22 @@ export const emptyTodo = (seed: number): api.Todo => ({
   isFav: false
 })
 
-export const init = (rand: number): [Model, cmd.Cmd<Action>] => {
-  const seed = random.seed(rand)
+export interface TodoFormEnv extends api.ApiEnv {
+  seed: number
+}
+
+export const init = (env: TodoFormEnv): stater.StateR<TodoFormEnv, Model, Action> => {
+  const seed = random.seed(env.seed)
   return [
     {
       seed,
       todo: emptyTodo(seed)
     },
-    cmd.none
+    cmdr.none
   ]
 }
 
-export const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
+export const update = (action: Action, model: Model): stater.StateR<TodoFormEnv, Model, Action> =>
   Action.match(action, {
     Add: () => [
       pipe(
@@ -52,7 +56,7 @@ export const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =
       ),
       pipe(
         api.add(model.todo),
-        cmd.map(Action.Api)
+        cmdr.map(Action.Api)
       )
     ],
     UpdateText: ({ text }) => [
@@ -60,9 +64,9 @@ export const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =
         model,
         todoTextLens.set(text)
       ),
-      cmd.none
+      cmdr.none
     ],
-    default: () => [model, cmd.none]
+    default: () => [model, cmdr.none]
   })
 
 export const view = (model: Model) => (dispatch: platform.Dispatch<Action>) => (

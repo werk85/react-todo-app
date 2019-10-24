@@ -13,7 +13,7 @@ const config: Configuration = {
 
   entry: {
     styles: ['./styles/app.scss'],
-    main: './src/index.tsx'
+    main: './src/index.ts'
   },
 
   output: {
@@ -66,14 +66,6 @@ const config: Configuration = {
       {
         test: /\.scss$/,
         loaders: ['style-loader', 'css-loader', 'sass-loader']
-      },
-      {
-        test: require.resolve('./src/tasks.json'),
-        type: 'javascript/auto',
-        loader: 'file-loader',
-        options: {
-          name: '[name].[hash].[ext]'
-        }
       }
     ]
   },

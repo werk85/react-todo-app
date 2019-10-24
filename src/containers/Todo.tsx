@@ -1,5 +1,5 @@
 import { Union, of } from 'ts-union'
-import { cmd, platform, state } from 'effe-ts'
+import { cmdr, platform, stater } from 'effe-ts'
 import { not, identity } from 'fp-ts/lib/function'
 import { pipe } from 'fp-ts/lib/pipeable'
 import { Lens, Optional } from 'monocle-ts'
@@ -59,18 +59,22 @@ export const Action = Union({
 })
 export type Action = typeof Action.T
 
-export const init = (todo: api.Document<api.Todo>): [Model, cmd.Cmd<Action>] => state.of(Model.None(todo))
+export interface TodoEnv extends api.ApiEnv {}
 
-export const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
-  Model.match(model, {
+export function init(todo: api.Document<api.Todo>): stater.StateR<TodoEnv, Model, Action> {
+  return stater.of(Model.None(todo))
+}
+
+export function update(action: Action, model: Model): stater.StateR<TodoEnv, Model, Action> {
+  return Model.match(model, {
     Editing: (todo, text) =>
       Action.match(action, {
-        Cancel: () => state.of(Model.None(todo)),
+        Cancel: () => stater.of(Model.None(todo)),
         Save: () => [
           Model.None({ ...todo, text }),
           pipe(
             api.update({ ...todo, text }),
-            cmd.map(Action.Api)
+            cmdr.map(Action.Api)
           )
         ],
         UpdateText: text => [
@@ -78,9 +82,9 @@ export const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =
             model,
             editingTextOptional.set(text)
           ),
-          cmd.none
+          cmdr.none
         ],
-        default: () => state.of(model)
+        default: () => stater.of(model)
       }),
     None: todo =>
       Action.match(action, {
@@ -92,9 +96,9 @@ export const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =
                 O.fromEither,
                 O.filter(change => change.doc._id === todo._id),
                 O.fold(
-                  () => state.of(model),
+                  () => stater.of(model),
                   ({ doc }) =>
-                    state.of(
+                    stater.of(
                       pipe(
                         model,
                         revLens.set(doc._rev)
@@ -103,7 +107,7 @@ export const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =
                 )
               ),
             Update: (_, response) =>
-              state.of(
+              stater.of(
                 pipe(
                   response,
                   O.fromEither,
@@ -118,14 +122,14 @@ export const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =
                   )
                 )
               ),
-            default: () => state.of(model)
+            default: () => stater.of(model)
           }),
-        Edit: () => state.of(Model.Editing(todo, todo.text)),
+        Edit: () => stater.of(Model.Editing(todo, todo.text)),
         Remove: () => [
           model,
           pipe(
             api.remove(todo),
-            cmd.map(Action.Api)
+            cmdr.map(Action.Api)
           )
         ],
         ToggleDone: () => {
@@ -139,9 +143,9 @@ export const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =
               None: todo =>
                 pipe(
                   api.update(todo),
-                  cmd.map(Action.Api)
+                  cmdr.map(Action.Api)
                 ),
-              default: () => cmd.none
+              default: () => cmdr.none
             })
           ]
         },
@@ -156,15 +160,16 @@ export const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =
               None: todo =>
                 pipe(
                   api.update(todo),
-                  cmd.map(Action.Api)
+                  cmdr.map(Action.Api)
                 ),
-              default: () => cmd.none
+              default: () => cmdr.none
             })
           ]
         },
-        default: () => state.of(model)
+        default: () => stater.of(model)
       })
   })
+}
 
 export const view = (model: Model) => (dispatch: platform.Dispatch<Action>) =>
   Model.match(model, {

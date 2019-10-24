@@ -5,20 +5,21 @@ import { atRecord } from 'monocle-ts/lib/At/Record'
 import { Prism, Lens } from 'monocle-ts/lib'
 import * as E from 'fp-ts/lib/Either'
 import * as A from 'fp-ts/lib/Array'
-import { cmd, html, state, platform } from 'effe-ts'
+import { cmdr, html, stater, platform, subr } from 'effe-ts'
 import { Union, of } from 'ts-union'
 import * as O from 'fp-ts/lib/Option'
 import * as NEA from 'fp-ts/lib/NonEmptyArray'
 import * as rx from 'rxjs/operators'
 import { fold } from 'fp-ts/lib/Monoid'
 import * as T from 'fp-ts/lib/Tuple'
+import * as Rr from 'fp-ts/lib/Reader'
+import { Observable } from 'rxjs'
 import { Title } from './components/Title'
 import { EmptyTodos } from './components/EmptyTodos'
 import { LoadingTodos } from './components/LoadingTodos'
 import * as TodoForm from './containers/TodoForm'
 import * as api from './api'
 import * as Todo from './containers/Todo'
-import * as ReactDOM from 'react-dom'
 import * as React from 'react'
 
 // Define how tasks should be ordered
@@ -28,10 +29,10 @@ const ordTodoIsDone = contramap<boolean, Todo.Model>(Todo.isDoneLens.get)(ordBoo
 const ordTodo = getSemigroup<Todo.Model>().concat(ordTodoIsDone, ordTodoText) // Combine both ordering strategies
 const sortTodos = A.sort(contramap<Todo.Model, [string, Todo.Model]>(([_, todo]) => todo)(ordTodo))
 
-interface Todos extends Record<string, Todo.Model> {}
+export interface Todos extends Record<string, Todo.Model> {}
 
 // The single state tree used by the application
-interface Model {
+export interface Model {
   current: TodoForm.Model
   todos: O.Option<Todos>
 }
@@ -48,33 +49,32 @@ const insertTodo = (id: string, model: Model) => (todoModel: Todo.Model): Model 
   )
 
 // All actions that can happen in our application
-const Action = Union({
+export const Action = Union({
   Api: of<api.Action>(),
   Todo: of<string, Todo.Action>(),
   TodoForm: of<TodoForm.Action>()
 })
-type Action = typeof Action.T
-const monoidCmd = cmd.getMonoid<Action>()
-const applicativeState = state.getApplicative<Action>()
+export type Action = typeof Action.T
 
-interface Flags {
-  seed: number
-}
+export interface AppEnv extends api.ApiEnv, Todo.TodoEnv, TodoForm.TodoFormEnv {}
+
+const monoidCmd = cmdr.getMonoid<AppEnv, Action>()
+const applicativeState = stater.getApplicative<AppEnv, Action>()
 
 // Generate the initial state of our application and trigger a command if wanted
-const init = (flags: Flags): [Model, cmd.Cmd<Action>] =>
-  pipe(
-    TodoForm.init(flags.seed),
+export function init(env: AppEnv): stater.StateR<AppEnv, Model, Action> {
+  return pipe(
+    TodoForm.init(env),
     T.bimap(
       todoCmd =>
         fold(monoidCmd)([
           pipe(
             todoCmd,
-            cmd.map(Action.TodoForm)
+            cmdr.map(Action.TodoForm)
           ),
           pipe(
             api.load,
-            cmd.map(Action.Api)
+            cmdr.map(Action.Api)
           )
         ]),
       current => ({
@@ -83,31 +83,32 @@ const init = (flags: Flags): [Model, cmd.Cmd<Action>] =>
       })
     )
   )
+}
 
-const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
-  Action.match(action, {
+export function update(action: Action, model: Model): stater.StateR<AppEnv, Model, Action> {
+  return Action.match(action, {
     Api: action =>
       api.Action.match(action, {
         Add: (todo, response) =>
           pipe(
             response,
             E.fold(
-              () => state.of(model),
+              () => stater.of(model),
               response =>
                 pipe(
                   Todo.init({
                     ...todo,
                     _rev: response.body.rev
                   }),
-                  T.bimap(cmd.map(action => Action.Todo(todo._id, action)), insertTodo(todo._id, model))
+                  T.bimap(cmdr.map(action => Action.Todo(todo._id, action)), insertTodo(todo._id, model))
                 )
             )
           ),
         Change: E.fold(
-          () => state.of(model),
+          () => stater.of(model),
           ({ doc }) => {
             if ('_deleted' in doc) {
-              return state.of(
+              return stater.of(
                 pipe(
                   model,
                   todosOptional.modify(R.deleteAt(doc._id))
@@ -116,19 +117,19 @@ const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
             } else {
               return pipe(
                 Todo.init(doc),
-                T.bimap(cmd.map(action => Action.Todo(doc._id, action)), insertTodo(doc._id, model))
+                T.bimap(cmdr.map(action => Action.Todo(doc._id, action)), insertTodo(doc._id, model))
               )
             }
           }
         ),
         Load: E.fold(
           // If the response is an error do nothing by returning the current model
-          () => state.of(model),
+          () => stater.of(model),
           // Else evaluate the http response
           response =>
             pipe(
               response.body.rows.map(row => Todo.init(row.doc)),
-              A.reduce(state.of<Todos, Action>({}), (result, [todoModel, todoCmd]) => {
+              A.reduce(stater.of<Todos>({}), (result, [todoModel, todoCmd]) => {
                 const id = pipe(
                   todoModel,
                   Todo.idLens.get
@@ -138,7 +139,7 @@ const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
                     R.insertAt(id, todoModel),
                     pipe(
                       todoCmd,
-                      cmd.map(action => Action.Todo(id, action))
+                      cmdr.map(action => Action.Todo(id, action))
                     )
                   ],
                   result
@@ -153,7 +154,7 @@ const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
             )
         ),
         Remove: (todo, response) =>
-          state.of(
+          stater.of(
             pipe(
               response,
               E.fold(
@@ -166,18 +167,18 @@ const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
               )
             )
           ),
-        default: () => state.of(model)
+        default: () => stater.of(model)
       }),
     Todo: (id, action) =>
       pipe(
         model,
         todoByIdOptional(id).getOption,
         O.fold(
-          () => state.of(model),
+          () => stater.of(model),
           todoModel =>
             pipe(
               Todo.update(action, todoModel),
-              T.bimap(cmd.map(action => Action.Todo(id, action)), todoModel =>
+              T.bimap(cmdr.map(action => Action.Todo(id, action)), todoModel =>
                 pipe(
                   model,
                   todoByIdOptional(id).set(todoModel)
@@ -189,17 +190,18 @@ const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
     TodoForm: action =>
       pipe(
         TodoForm.update(action, model.current),
-        T.bimap(cmd.map(Action.TodoForm), formModel =>
+        T.bimap(cmdr.map(Action.TodoForm), formModel =>
           pipe(
             model,
             currentLens.set(formModel)
           )
         )
       ),
-    default: () => state.of(model)
+    default: () => stater.of(model)
   })
+}
 
-const view = (model: Model) => {
+const view = (model: Model) => (dispatch: platform.Dispatch<Action>) => {
   // Convert todos record to non empty array and sort it
   // The result is a Option<Option<NonEmptyArray<Todo>>> type
   // The most outer Option signalize the loading state. The inner Option signalize if the array is empty or not
@@ -216,15 +218,18 @@ const view = (model: Model) => {
       total: todos.length
     }))
   )
+  const Form = () => TodoForm.view(model.current)(action => dispatch(Action.TodoForm(action)))
 
-  return (dispatch: platform.Dispatch<Action>) => (
+  return (
     <div className="card">
       <div className="card-header">
         <h3 className="card-title">
           <Title stats={stats} />
         </h3>
       </div>
-      <div className="card-body">{TodoForm.view(model.current)(action => dispatch(Action.TodoForm(action)))}</div>
+      <div className="card-body">
+        <Form />
+      </div>
       <ul className="list-group list-group-flush">
         {pipe(
           // Unpacking the todos Option<Option<NonEmptyArray<Todo>>> object
@@ -247,19 +252,10 @@ const view = (model: Model) => {
   )
 }
 
-const app = html.programWithFlags(init, update, view, model =>
-  pipe(
-    model.todos,
-    O.fold(api.changes.stop, api.changes.start),
-    rx.map(Action.Api)
-  )
+export const subscriptions: subr.SubR<AppEnv, Model, Action> = pipe(
+  api.subscriptions,
+  Rr.map(Rr.local<Observable<Model>, Observable<boolean>>(rx.map(model => O.isSome(model.todos)))),
+  subr.map(Action.Api)
 )
 
-html.run(
-  app({
-    seed: Date.now() * Math.random()
-  }),
-  dom => {
-    ReactDOM.render(dom, document.getElementById('app'))
-  }
-)
+export const app = html.programR(init, update, view, subscriptions)

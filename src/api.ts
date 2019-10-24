@@ -1,8 +1,8 @@
 import { Union, of } from 'ts-union'
 import * as t from 'io-ts'
-import { cmd, http } from 'effe-ts'
+import { cmdr, http, subr } from 'effe-ts'
 import { withFallback } from 'io-ts-types/lib/withFallback'
-import { Observable, Subject, BehaviorSubject, empty, from } from 'rxjs'
+import { Observable, BehaviorSubject, empty, from, concat } from 'rxjs'
 import { fromFetch } from 'rxjs/fetch'
 import * as E from 'fp-ts/lib/Either'
 import * as rx from 'rxjs/operators'
@@ -99,7 +99,12 @@ export const Action = Union({
 })
 export type Action = typeof Action.T
 
-export const load: cmd.Cmd<Action> = http.send(http.get('/todos/_all_docs?include_docs=true', AllDocsResponse(Todo)), Action.Load)
+export interface ApiEnv extends http.HttpEnv {}
+
+export const load: cmdr.CmdR<ApiEnv, Action> = http.send(
+  http.get('/todos/_all_docs?include_docs=true', AllDocsResponse(Todo)),
+  Action.Load
+)
 export const add = (todo: Todo) =>
   http.send(http.put(`/todos/${todo._id}`, Todo.encode(todo), Response), response => Action.Add(todo, response))
 export const remove = (todo: Document<Todo>) =>
@@ -109,33 +114,20 @@ export const update = (todo: Document<Todo>) =>
     Action.Update(todo, response)
   )
 
-const changes$ = new Subject<Action>()
-const lastSeq$ = new BehaviorSubject<string | t.Int>('now')
-const isRunning$ = new BehaviorSubject(false)
+export const subscriptions: subr.SubR<ApiEnv, boolean, Action> = () => isRunning$ => {
+  const lastSeq$ = new BehaviorSubject<string | t.Int>('now')
+  const poll$: Observable<Action> = pipe(
+    fromFetch(`/todos/_changes?feed=longpoll&include_docs=true&since=${lastSeq$.value}`),
+    rx.switchMap(response => response.json()),
+    rx.tap(body => lastSeq$.next(body.last_seq)),
+    rx.switchMap(body =>
+      concat(from<Array<Action>>(body.results.map((result: unknown) => Action.Change(Change(Todo).decode(result)))), poll$)
+    )
+  )
 
-const poll$: Observable<void> = pipe(
-  fromFetch(`/todos/_changes?feed=longpoll&include_docs=true&since=${lastSeq$.value}`),
-  rx.switchMap(response => from(response.json())),
-  rx.tap(body => {
-    body.results.forEach((result: unknown) => changes$.next(Action.Change(Change(Todo).decode(result))))
-    lastSeq$.next(body.last_seq)
-  }),
-  rx.switchMap(() => poll$)
-)
-
-pipe(
-  isRunning$,
-  rx.distinctUntilChanged(),
-  rx.switchMap(isRunning => (isRunning ? poll$ : empty()))
-).subscribe()
-
-export const changes = {
-  start: (): Observable<Action> => {
-    isRunning$.next(true)
-    return changes$
-  },
-  stop: (): Observable<Action> => {
-    isRunning$.next(false)
-    return empty()
-  }
+  return pipe(
+    isRunning$,
+    rx.distinctUntilChanged(),
+    rx.switchMap(isRunning => (isRunning ? poll$ : empty()))
+  )
 }
