@@ -55,7 +55,7 @@ const Action = Union({
 })
 type Action = typeof Action.T
 const monoidCmd = cmd.getMonoid<Action>()
-const monoidState = state.getApplicative<Action>()
+const applicativeState = state.getApplicative<Action>()
 
 interface Flags {
   seed: number
@@ -133,7 +133,7 @@ const update = (action: Action, model: Model): [Model, cmd.Cmd<Action>] =>
                   todoModel,
                   Todo.idLens.get
                 )
-                return monoidState.ap(
+                return applicativeState.ap(
                   [
                     R.insertAt(id, todoModel),
                     pipe(

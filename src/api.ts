@@ -17,7 +17,7 @@ export const Todo = t.interface(
   },
   'Todo'
 )
-export type Todo = t.TypeOf<typeof Todo>
+export interface Todo extends t.TypeOf<typeof Todo> {}
 
 export const Document = <A, O>(Doc: t.Type<A, O>) =>
   t.intersection([
@@ -67,7 +67,7 @@ export const Response = t.interface(
   },
   'Response'
 )
-export type Response = t.TypeOf<typeof Response>
+export interface Response extends t.TypeOf<typeof Response> {}
 
 export const Change = <A, O>(Doc: t.Type<A, O>) =>
   t.interface({
