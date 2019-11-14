@@ -1,5 +1,5 @@
 import { html, http } from 'effe-ts'
-import { app } from 'App'
+import { app } from './App'
 import * as ReactDOM from 'react-dom'
 
 html.run(
