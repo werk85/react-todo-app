@@ -1,3 +1,4 @@
+import { start } from 'repl'
 import { cmdr, platform, stater } from 'effe-ts'
 import { Union, of } from 'ts-union'
 import { Lens } from 'monocle-ts'
@@ -37,13 +38,10 @@ export interface TodoFormEnv extends api.ApiEnv {
 
 export const init = (env: TodoFormEnv): stater.StateR<TodoFormEnv, Model, Action> => {
   const seed = random.seed(env.seed)
-  return [
-    {
-      seed,
-      todo: emptyTodo(seed)
-    },
-    cmdr.none
-  ]
+  return stater.of({
+    seed,
+    todo: emptyTodo(seed)
+  })
 }
 
 export const update = (action: Action, model: Model): stater.StateR<TodoFormEnv, Model, Action> =>
@@ -59,14 +57,14 @@ export const update = (action: Action, model: Model): stater.StateR<TodoFormEnv,
         cmdr.map(Action.Api)
       )
     ],
-    UpdateText: ({ text }) => [
-      pipe(
-        model,
-        todoTextLens.set(text)
+    UpdateText: ({ text }) =>
+      stater.of(
+        pipe(
+          model,
+          todoTextLens.set(text)
+        )
       ),
-      cmdr.none
-    ],
-    default: () => [model, cmdr.none]
+    default: () => stater.of(model)
   })
 
 export const view = (model: Model) => (dispatch: platform.Dispatch<Action>) => (

@@ -77,13 +77,13 @@ export function update(action: Action, model: Model): stater.StateR<TodoEnv, Mod
             cmdr.map(Action.Api)
           )
         ],
-        UpdateText: text => [
-          pipe(
-            model,
-            editingTextOptional.set(text)
+        UpdateText: text =>
+          stater.of(
+            pipe(
+              model,
+              editingTextOptional.set(text)
+            )
           ),
-          cmdr.none
-        ],
         default: () => stater.of(model)
       }),
     None: todo =>
