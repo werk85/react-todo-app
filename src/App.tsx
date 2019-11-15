@@ -59,7 +59,6 @@ export type Action = typeof Action.T
 export interface AppEnv extends api.ApiEnv, Todo.TodoEnv, TodoForm.TodoFormEnv {}
 
 const monoidCmd = cmdr.getMonoid<AppEnv, Action>()
-const applicativeState = stater.getApplicative<AppEnv, Action>()
 
 // Generate the initial state of our application and trigger a command if wanted
 export function init(env: AppEnv): stater.StateR<AppEnv, Model, Action> {
@@ -100,7 +99,7 @@ export function update(action: Action, model: Model): stater.StateR<AppEnv, Mode
                     ...todo,
                     _rev: response.body.rev
                   }),
-                  T.bimap(cmdr.map(action => Action.Todo(todo._id, action)), insertTodo(todo._id, model))
+                  stater.bimap(action => Action.Todo(todo._id, action), insertTodo(todo._id, model))
                 )
             )
           ),
@@ -117,7 +116,7 @@ export function update(action: Action, model: Model): stater.StateR<AppEnv, Mode
             } else {
               return pipe(
                 Todo.init(doc),
-                T.bimap(cmdr.map(action => Action.Todo(doc._id, action)), insertTodo(doc._id, model))
+                stater.bimap(action => Action.Todo(doc._id, action), insertTodo(doc._id, model))
               )
             }
           }
@@ -129,12 +128,12 @@ export function update(action: Action, model: Model): stater.StateR<AppEnv, Mode
           response =>
             pipe(
               response.body.rows.map(row => Todo.init(row.doc)),
-              A.reduce(stater.of<Todos>({}), (result, [todoModel, todoCmd]) => {
+              A.reduce(stater.of<AppEnv, Todos, Action>({}), (result, [todoModel, todoCmd]) => {
                 const id = pipe(
                   todoModel,
                   Todo.idLens.get
                 )
-                return applicativeState.ap(
+                return stater.stater.ap(
                   [
                     R.insertAt(id, todoModel),
                     pipe(
@@ -178,24 +177,16 @@ export function update(action: Action, model: Model): stater.StateR<AppEnv, Mode
           todoModel =>
             pipe(
               Todo.update(action, todoModel),
-              T.bimap(cmdr.map(action => Action.Todo(id, action)), todoModel =>
-                pipe(
-                  model,
-                  todoByIdOptional(id).set(todoModel)
-                )
-              )
+              stater.bimap(action => Action.Todo(id, action), todoByIdOptional(id).set),
+              stater.ap(stater.of(model))
             )
         )
       ),
     TodoForm: action =>
       pipe(
         TodoForm.update(action, model.current),
-        T.bimap(cmdr.map(Action.TodoForm), formModel =>
-          pipe(
-            model,
-            currentLens.set(formModel)
-          )
-        )
+        stater.bimap(Action.TodoForm, currentLens.set),
+        stater.ap(stater.of(model))
       ),
     default: () => stater.of(model)
   })
