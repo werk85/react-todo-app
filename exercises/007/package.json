@@ -45,7 +45,7 @@
     "io-ts": "2.0.1",
     "io-ts-types": "0.5.1",
     "monocle-ts": "2.0.0",
-    "node-sass": "4.12.0",
+    "node-sass": "7.0.0",
     "pouchdb-server": "4.1.0",
     "react": "16.9.0",
     "react-dom": "16.9.0",
